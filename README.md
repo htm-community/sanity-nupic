@@ -2,7 +2,14 @@
 
 This uses a [temporary fork](https://github.com/mrcslws/comportexviz/tree/nupic-hack) of ComportexViz. Specifically, the "nupic-hack" branch.
 
-Install dependencies. (TODO)
+Install dependencies:
+
+~~~
+pip install Twisted
+pip install nupic
+pip install autobahn
+pip install transit-python
+~~~
 
 Host the "public" folder on a local webserver.
 
