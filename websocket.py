@@ -3,6 +3,7 @@ from transit.writer import Writer
 from transit.reader import Reader
 from transit.transit_types import Keyword
 from StringIO import StringIO
+from twisted.internet import reactor
 
 def toTransitStr(v):
     io = StringIO()
@@ -18,12 +19,14 @@ class WebSocketChannelProxy(object):
     def close(self):
         m = [self.target, Keyword("put!")]
         serialized = toTransitStr(m)
-        self.websocket.sendMessage(serialized, False)
+        reactor.callFromThread(WebSocketServerProtocol.sendMessage,
+                               self.websocket, serialized, False)
 
     def put(self,msg):
         m = [self.target, Keyword("put!"), msg]
         serialized = toTransitStr(m)
-        self.websocket.sendMessage(serialized, False)
+        reactor.callFromThread(WebSocketServerProtocol.sendMessage,
+                               self.websocket, serialized, False)
 
 def channelProxyHandler(websocket):
     class ChannelProxyHandler(object):
