@@ -79,7 +79,6 @@ class Journal(object):
         self.journal = []
         self.subscribers = []
         self.nextModelId = 0
-        self.nKeepSteps = 50
 
         sp = model._getSPRegion().getSelf()._sfdr
         self.inputDimensions = sp.getInputDimensions()
@@ -87,12 +86,38 @@ class Journal(object):
 
         self.cellsPerColumn = model._getTPRegion().getSelf()._tfdr.cellsPerColumn
 
+        self.captureOptions = {
+            Keyword("keep-steps"): 50,
+            Keyword("ff-synapses"): {
+                Keyword("capture?"): False,
+                Keyword("active?"): True,
+                Keyword("disconnected?"): False,
+                Keyword("inactive?"): False,
+            },
+            Keyword("distal-synapses"): {
+                Keyword("capture?"): False,
+                Keyword("active?"): True,
+                Keyword("disconnected?"): False,
+                Keyword("inactive?"): False,
+            },
+        }
+
     def append(self, model):
         modelData = getBitStates(model)
-        modelData["proximalSynapses"] = getProximalSynapses(model, modelData["activeBits"])
-        if len(self.journal) > 0:
+
+        # TODO: grab the specified synapse types
+
+        if self.captureOptions[Keyword("ff-synapses")][Keyword("capture?")]:
+            modelData["proximalSynapses"] = getProximalSynapses(model, modelData["activeBits"])
+        else:
+            modelData["proximalSynapses"] = []
+        if len(self.journal) > 0 and \
+           self.captureOptions[Keyword("distal-synapses")][Keyword("capture?")]:
+
             prevActiveCells = self.journal[-1]["activeCells"]
             modelData["distalSegments"] = getDistalSegments(model, prevActiveCells)
+        else:
+            modelData["distalSegments"] = []
         self.journal.append(modelData)
 
         # TODO: only keep nKeepSteps models
@@ -107,14 +132,15 @@ class Journal(object):
         command = str(msg[0])
         args = msg[1:]
         if command == "connect":
-            print "Connect!"
+            pass
+        elif command == "ping":
+            pass
         elif command == "subscribe":
-            keepSteps, stepsChannel, responseChannel = args
-            self.nKeepSteps = keepSteps
+            stepsChannel, responseChannel = args
 
             self.subscribers.append(stepsChannel)
 
-            responseChannel.put({
+            stepTemplate = {
                 Keyword("senses"): {
                     Keyword("concatenated"): {
                         Keyword("dimensions"): self.inputDimensions,
@@ -127,7 +153,9 @@ class Journal(object):
                         },
                     },
                 },
-            })
+            }
+
+            responseChannel.put([stepTemplate, self.captureOptions])
         elif command == "get-cells-segments":
             modelId, rgnId, lyrId, col, ci_si, token, responseChannel = args
 
@@ -192,8 +220,6 @@ class Journal(object):
                     }
                     segs[segIdx] = segData
 
-                print "SEGMENTS"
-                print segs
                 cellData[Keyword("segments")] = segs
 
                 ret[i] = cellData
@@ -247,6 +273,9 @@ class Journal(object):
                     },
                 },
             })
+        elif command == "set-capture-options":
+            captureOptions, = args
+            self.captureOptions = captureOptions
         elif command == "register-viewport":
             viewport, responseChannel = args
             # Not actually used yet, but the client needs a token.
