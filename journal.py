@@ -86,15 +86,13 @@ class Journal(object):
             Keyword("keep-steps"): 50,
             Keyword("ff-synapses"): {
                 Keyword("capture?"): False,
-                Keyword("active?"): True,
-                Keyword("disconnected?"): False,
-                Keyword("inactive?"): False,
+                Keyword("min-perm"): 0.1, # TODO
+                Keyword("only-active?"): True,
             },
             Keyword("distal-synapses"): {
                 Keyword("capture?"): False,
-                Keyword("active?"): True,
-                Keyword("disconnected?"): False,
-                Keyword("inactive?"): False,
+                Keyword("min-perm"): 0.5, # TODO
+                Keyword("only-active?"): True,
             },
         }
 
