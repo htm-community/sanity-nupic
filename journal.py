@@ -68,10 +68,6 @@ def makeStep(model, modelId):
     return {
         Keyword("model-id"): modelId,
         Keyword("timestep"): modelId, # hack
-        # Keyword("input-value"): model._input,
-        # Keyword("sensed-values"): {
-        #     Keyword("concatenated"): model._input,
-        # },
     }
 
 class Journal(object):
@@ -102,7 +98,7 @@ class Journal(object):
             },
         }
 
-    def append(self, model):
+    def append(self, model, displayValue=None):
         modelData = getBitStates(model)
 
         # TODO: grab the specified synapse types
@@ -124,6 +120,9 @@ class Journal(object):
 
         step = makeStep(model, self.nextModelId)
         self.nextModelId += 1
+
+        if displayValue:
+            step[Keyword("display-value")] = displayValue
 
         for subscriber in self.subscribers:
             subscriber.put(step)
@@ -224,7 +223,9 @@ class Journal(object):
 
                 ret[i] = cellData
 
-            responseChannel.put(ret)
+            responseChannel.put({
+                Keyword("distal"): ret,
+            })
 
         elif command == "get-ff-in-synapses":
             modelId, rgnId, lyrId, onlyColumns, token, responseChannel = args

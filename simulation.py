@@ -32,7 +32,10 @@ class Simulation(object):
             "timestamp": datetime.datetime.strptime(timestampStr, "%m/%d/%y %H:%M"),
             "kw_energy_consumption": float(consumptionStr),
         })
-        self.journal.append(self.model)
+        self.journal.append(self.model, [
+            ["time", timestampStr],
+            ["power consumption (kW)", consumptionStr],
+        ])
 
     def handleMessage(self, msg):
         command = str(msg[0])
