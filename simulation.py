@@ -1,4 +1,3 @@
-import datetime
 import threading
 
 def simulationThread(simulation, checkEvent):
@@ -9,12 +8,11 @@ def simulationThread(simulation, checkEvent):
         checkEvent.clear()
 
 class Simulation(object):
-    def __init__(self, model, journal, inputIter):
-        self.model = model
+    def __init__(self, journal, stepfn):
         self.journal = journal
-        self.inputIter = inputIter
         self.statusSubscribers = []
         self.isGoing = False
+        self.stepfn = stepfn
         self.checkStatusEvent = threading.Event()
         self.simThread = threading.Thread(target = simulationThread,
                                           args = (self, self.checkStatusEvent))
@@ -27,15 +25,8 @@ class Simulation(object):
             subscriber.put([self.isGoing])
 
     def step(self):
-        timestampStr, consumptionStr = self.inputIter.next()
-        self.model.run({
-            "timestamp": datetime.datetime.strptime(timestampStr, "%m/%d/%y %H:%M"),
-            "kw_energy_consumption": float(consumptionStr),
-        })
-        self.journal.append(self.model, [
-            ["time", timestampStr],
-            ["power consumption (kW)", consumptionStr],
-        ])
+        model, displayValue = self.stepfn()
+        self.journal.append(model, displayValue)
 
     def handleMessage(self, msg):
         command = str(msg[0])
