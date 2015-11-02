@@ -74,9 +74,17 @@ if __name__ == '__main__':
 
     shifter = InferenceShifter()
 
+    shouldScheduleDraw = True
+
+    def draw():
+        global shouldScheduleDraw
+        shouldScheduleDraw = True
+        plt.draw()
+        plt.legend(('actual', 'predicted'), loc=3)
+
     def step():
         global dates, convertedDates, actualValues, predictedValues, \
-            linesInitialized, actualLines, predictedLines
+            linesInitialized, actualLines, predictedLines, shouldScheduleDraw
         timestampStr, consumptionStr = csvReader.next()
         timestamp = datetime.datetime.strptime(timestampStr, "%m/%d/%y %H:%M")
         consumption = float(consumptionStr)
@@ -116,8 +124,11 @@ if __name__ == '__main__':
         graph.relim()
         graph.autoscale_view(True, True, True)
 
-        plt.draw()
-        plt.legend(('actual', 'predicted'), loc=3)
+        if shouldScheduleDraw:
+            # If we're stepping the model really quickly, coalesce the redraws.
+            shouldScheduleDraw = False
+            t = threading.Timer(0.2, draw)
+            t.start()
 
         return (model, [
             ["time", timestampStr],

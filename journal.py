@@ -1,4 +1,5 @@
 import numpy
+from collections import deque
 from nupic.bindings.math import GetNTAReal
 from transit.transit_types import Keyword
 
@@ -17,7 +18,7 @@ def getBitStates(model):
     }
 
 def getProximalSynapses(model, onlyBits, onlyConnected=True):
-    proximalSynapses = [] # TODO try deque
+    proximalSynapses = deque()
     spRegion = model._getSPRegion().getSelf()
     sp = spRegion._sfdr
     tpRegion = model._getTPRegion()
@@ -40,7 +41,7 @@ def getDistalSegments(model, onlyTargets, onlyConnected=True):
     sp = spRegion._sfdr
     tp = model._getTPRegion().getSelf()._tfdr
 
-    distalSegments = [] # TODO try deque
+    distalSegments = deque()
 
     for col in range(sp.getNumColumns()):
         for cell in range(tp.cellsPerColumn):
