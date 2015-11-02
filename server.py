@@ -76,8 +76,10 @@ if __name__ == '__main__':
     shouldScheduleDraw = True
 
     def draw():
-        global shouldScheduleDraw
+        global shouldScheduleDraw, graph
         shouldScheduleDraw = True
+        graph.relim()
+        graph.autoscale_view(True, True, True)
         plt.draw()
         plt.legend(('actual', 'predicted'), loc=3)
 
@@ -120,9 +122,6 @@ if __name__ == '__main__':
         actualLines.set_ydata(actualValues)
         predictedLines.set_xdata(convertedDates)
         predictedLines.set_ydata(predictedValues)
-
-        graph.relim()
-        graph.autoscale_view(True, True, True)
 
         if shouldScheduleDraw:
             # If we're stepping the model really quickly, coalesce the redraws.
