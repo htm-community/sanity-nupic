@@ -329,5 +329,5 @@ class Journal(object):
             viewport, responseChannel = args
             # Not actually used yet, but the client needs a token.
             responseChannel.put("this is your token")
-        else:
-            print "Unrecognized command! %s" % command
+        # else:
+        #     print "Unrecognized command! %s" % command

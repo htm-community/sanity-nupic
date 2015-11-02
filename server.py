@@ -64,7 +64,7 @@ if __name__ == '__main__':
     predictedLines = None
     linesInitialized = False
     plotCount = 1
-    fig = plt.figure(figsize=(8, 6))
+    fig = plt.figure(figsize=(6.8, 11))
     gs = gridspec.GridSpec(plotCount, 1)
     graph = fig.add_subplot(gs[0, 0])
     plt.xlabel('Date')
@@ -102,12 +102,12 @@ if __name__ == '__main__':
             convertedDates += [date2num(date) for date in dates]
 
             addedLinesActual, = graph.plot(
-                dates, actualValues
+                dates, actualValues, 'r'
             )
             actualLines = addedLinesActual
 
             predictedLinesActual, = graph.plot(
-                dates, predictedValues
+                dates, predictedValues, 'b'
             )
             predictedLines = predictedLinesActual
             graph.xaxis.set_major_formatter(DateFormatter("%H:%M"))

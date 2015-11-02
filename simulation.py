@@ -49,5 +49,5 @@ class Simulation(object):
             subscriberChannel, = args
             self.statusSubscribers.append(subscriberChannel)
             subscriberChannel.put([self.isGoing])
-        else:
-            print "Unrecognized command! %s" % command
+        # else:
+        #     print "Unrecognized command! %s" % command
