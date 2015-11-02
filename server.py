@@ -41,7 +41,7 @@ import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from matplotlib.dates import date2num
+from matplotlib.dates import date2num, DateFormatter
 
 if __name__ == '__main__':
     from nupic.frameworks.opf.modelfactory import ModelFactory
@@ -64,10 +64,9 @@ if __name__ == '__main__':
     predictedLines = None
     linesInitialized = False
     plotCount = 1
-    fig = plt.figure(figsize=(14, 6))
+    fig = plt.figure(figsize=(8, 6))
     gs = gridspec.GridSpec(plotCount, 1)
     graph = fig.add_subplot(gs[0, 0])
-    plt.title("Marcus")
     plt.xlabel('Date')
     plt.ylabel('Consumption (kW)')
     plt.tight_layout()
@@ -109,6 +108,7 @@ if __name__ == '__main__':
                 dates, predictedValues
             )
             predictedLines = predictedLinesActual
+            graph.xaxis.set_major_formatter(DateFormatter("%H:%M"))
             linesInitialized = True
 
         dates.append(timestamp)
