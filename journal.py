@@ -17,7 +17,7 @@ def getBitStates(model):
     }
 
 def getProximalSynapses(model, onlyBits, onlyConnected=True):
-    proximalSynapses = []
+    proximalSynapses = [] # TODO try deque
     spRegion = model._getSPRegion().getSelf()
     sp = spRegion._sfdr
     tpRegion = model._getTPRegion()
@@ -40,7 +40,7 @@ def getDistalSegments(model, onlyTargets, onlyConnected=True):
     sp = spRegion._sfdr
     tp = model._getTPRegion().getSelf()._tfdr
 
-    distalSegments = []
+    distalSegments = [] # TODO try deque
 
     for col in range(sp.getNumColumns()):
         for cell in range(tp.cellsPerColumn):
@@ -48,18 +48,37 @@ def getDistalSegments(model, onlyTargets, onlyConnected=True):
                 v = tp.getSegmentOnCell(col, cell, segIdx)
                 segData = v[0]
                 synapses = []
+                nConnectedActive = 0
+                nConnectedTotal = 0
+                nDisconnectedActive = 0
+                nDisconnectedTotal = 0
                 for targetCol, targetCell, perm in v[1:]:
                     cellId = targetCol * tp.cellsPerColumn + targetCell
-                    # TODO use tp.connectedPerm, not 0.2
-                    # Until then, the UI lies. But it's good for testing.
-                    if cellId in onlyTargets and perm >= 0.2:
-                        syn = (targetCol, targetCell, perm)
-                        synapses.append(syn)
+                    isConnected = perm >= tp.connectedPerm
+                    isActive = cellId in onlyTargets
+
+                    if isConnected:
+                        nConnectedTotal += 1
+                    else:
+                        nDisconnectedTotal += 1
+
+                    if isActive:
+                        if isConnected:
+                            nConnectedActive += 1
+                            syn = (targetCol, targetCell, perm)
+                            synapses.append(syn)
+                        else:
+                            nDisconnectedActive += 1
                 distalSegments.append({
                     "column": col,
                     "cell": cell,
-                    "learn": True, # TODO
                     "synapses": synapses,
+                    "nConnectedActive": nConnectedActive,
+                    "nConnectedTotal": nConnectedTotal,
+                    "nDisconnectedActive": nDisconnectedActive,
+                    "nDisconnectedTotal": nDisconnectedTotal,
+                    "nLearningThreshold": tp.minThreshold, # TODO don't do per-segment
+                    "nStimulusThreshold": tp.activationThreshold, # TODO don't do per-segment
                 })
 
     return distalSegments
@@ -176,6 +195,10 @@ class Journal(object):
             colSegs = filter(lambda x: (x["column"] == col),
                              modelData["distalSegments"])
 
+            connectedActiveMax = -1
+            cellWithMax = None
+            segIdxWithMax = None
+
             for i in range(self.cellsPerColumn):
                 isActive = (i + lower) in ac
                 isPredicted = (i + lower) in pc
@@ -201,6 +224,8 @@ class Journal(object):
                                   colSegs):
                     segIdx += 1
 
+                    # TODO only send synapses according to viz-options
+                    # e.g. only for selected segment
                     activeSynapses = []
                     for targetCol, targetCell, perm in seg["synapses"]:
                         activeSynapses.append({
@@ -210,7 +235,19 @@ class Journal(object):
                             Keyword("perm"): perm,
                         })
 
+                    nConnectedActive = seg["nConnectedActive"]
+                    if nConnectedActive > connectedActiveMax:
+                        connectedActiveMax = nConnectedActive
+                        cellWithMax = i
+                        segIdxWithMax = segIdx
+
                     segData = {
+                        Keyword("n-conn-act"): nConnectedActive,
+                        Keyword("n-conn-tot"): seg["nConnectedTotal"],
+                        Keyword("n-disc-act"): seg["nDisconnectedActive"],
+                        Keyword("n-disc-tot"): seg["nDisconnectedTotal"],
+                        Keyword("stimulus-th"): seg["nStimulusThreshold"],
+                        Keyword("learning-th"): seg["nLearningThreshold"],
                         Keyword("syns-by-state"): {
                             Keyword("active"): activeSynapses,
                         },
@@ -220,6 +257,18 @@ class Journal(object):
                 cellData[Keyword("segments")] = segs
 
                 ret[i] = cellData
+
+            selCell = None
+            selSegIdx = None
+            if ci_si is not None:
+                selCell, selSegIdx = ci_si
+            elif cellWithMax is not None and segIdxWithMax is not None:
+                selCell = cellWithMax
+                selSegIdx = segIdxWithMax
+
+            if selCell is not None and selSegIdx is not None:
+                ret[selCell][Keyword("selected-cell?")] = True
+                ret[selCell][Keyword("segments")][selSegIdx][Keyword("selected-seg?")] = True
 
             responseChannel.put({
                 Keyword("distal"): ret,
@@ -254,7 +303,7 @@ class Journal(object):
             modelData = self.journal[modelId]
 
             predColumns = None
-            if (modelId > 0):
+            if modelId > 0:
                 predColumns = self.journal[modelId - 1]["predictedColumns"]
 
             responseChannel.put({
