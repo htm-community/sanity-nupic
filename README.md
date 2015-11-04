@@ -11,10 +11,20 @@ pip install autobahn
 pip install transit-python
 ~~~
 
-Host the "public" folder on a local webserver.
+Compile ComportexViz, or download it [here](http://mrcslws.com/stuff/comportexviz.6387216.zip).
 
 ~~~
-cd public
+# Optional
+cd comportexviz
+lein cljsbuild once demos
+cd ..
+~~~
+
+If you downloaded it, copy the "out" folder into `comportexviz/public/demos/`. The webpage needs to be able to find the path `comportexviz/public/demos/out/comportexviz.js`.
+
+Host the root folder ("comportexviz-nupic") on a local webserver.
+
+~~~
 python -m SimpleHTTPServer 8000
 ~~~
 
