@@ -2,6 +2,13 @@
 
 This uses a [temporary fork](https://github.com/mrcslws/comportexviz/tree/nupic-hack) of ComportexViz. Specifically, the "nupic-hack" branch.
 
+Clone this repo, and fetch the submodules:
+
+~~~
+cd comportexviz-nupic
+git submodule update --init --recursive
+~~~
+
 Install dependencies:
 
 ~~~
@@ -22,7 +29,7 @@ cd ..
 
 If you downloaded it, copy the "out" folder into `comportexviz/public/demos/`. The webpage needs to be able to find the path `comportexviz/public/demos/out/comportexviz.js`.
 
-Host the root folder ("comportexviz-nupic") on a local webserver.
+Host the root folder (`comportexviz-nupic`) on a local webserver.
 
 ~~~
 python -m SimpleHTTPServer 8000
