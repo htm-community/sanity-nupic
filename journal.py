@@ -36,14 +36,14 @@ def getProximalSynapses(model, onlyBits, onlyConnected=True):
 
     return proximalSynapses
 
-def getDistalSegments(model, onlyTargets, onlyConnected=True):
+def getDistalSegments(model, columnsToCheck, onlyTargets, onlyConnected=True):
     spRegion = model._getSPRegion().getSelf()
     sp = spRegion._sfdr
     tp = model._getTPRegion().getSelf()._tfdr
 
     distalSegments = deque()
 
-    for col in range(sp.getNumColumns()):
+    for col in columnsToCheck:
         for cell in range(tp.cellsPerColumn):
             for segIdx in range(tp.getNumSegmentsInCell(col, cell)):
                 v = tp.getSegmentOnCell(col, cell, segIdx)
@@ -113,6 +113,7 @@ class Journal(object):
                 Keyword("capture?"): False,
                 Keyword("min-perm"): 0.5, # TODO
                 Keyword("only-active?"): True,
+                Keyword("only-noteworthy-columns?"): True,
             },
         }
 
@@ -129,7 +130,9 @@ class Journal(object):
            self.captureOptions[Keyword("distal-synapses")][Keyword("capture?")]:
 
             prevActiveCells = self.journal[-1]["activeCells"]
-            modelData["distalSegments"] = getDistalSegments(model, prevActiveCells)
+            prevPredictedColumns = self.journal[-1]["predictedColumns"]
+            columnsToCheck = modelData["activeColumns"] + prevPredictedColumns
+            modelData["distalSegments"] = getDistalSegments(model, columnsToCheck, prevActiveCells)
         else:
             modelData["distalSegments"] = []
         self.journal.append(modelData)
