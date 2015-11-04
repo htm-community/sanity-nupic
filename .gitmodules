@@ -1,0 +1,4 @@
+[submodule "comportexviz"]
+	path = comportexviz
+	url = https://github.com/mrcslws/comportexviz.git
+	branch = nupic-hack
