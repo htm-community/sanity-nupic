@@ -2,6 +2,9 @@ import datetime
 import threading
 from collections import deque
 
+import os, sys
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
+
 from simulation import Simulation
 from journal import Journal
 from websocket import runnerWebSocketProtocol
@@ -65,8 +68,12 @@ if __name__ == '__main__':
     model = ModelFactory.create(MODEL_PARAMS)
     model.enableInference({"predictedField": "kw_energy_consumption"})
 
+    import os
+    inputPath = os.path.join(os.path.dirname(__file__),
+                             "data/rec-center-hourly.csv")
+
     import csv
-    inputFile = open("data/rec-center-hourly.csv", "rb")
+    inputFile = open(inputPath, "rb")
     csvReader = csv.reader(inputFile)
     csvReader.next()
     csvReader.next()

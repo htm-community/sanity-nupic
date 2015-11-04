@@ -38,7 +38,7 @@ python -m SimpleHTTPServer 8000
 Run the websocket.
 
 ~~~
-python server.py
+python examples/hotgym-plot.py
 ~~~
 
 Navigate to http://localhost:8000
