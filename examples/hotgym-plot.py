@@ -5,41 +5,11 @@ from collections import deque
 import os, sys
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
-from simulation import Simulation
-from journal import Journal
-from websocket import runnerWebSocketProtocol
-from swarmed_model_params import MODEL_PARAMS
-
-def startRunner(model, stepfn):
-    journal = Journal(model)
-    journal.append(model)
-
-    from transit.transit_types import Keyword
-    localTargets = {
-        Keyword("into-sim"): lambda x: simulation.handleMessage(x),
-        Keyword("into-journal"): lambda x: journal.handleMessage(x),
-    }
-
-    simulation = Simulation(journal, stepfn)
-
-    import sys
-    from twisted.python import log
-    log.startLogging(sys.stdout)
-
-    from autobahn.twisted.websocket import WebSocketServerFactory
-    port = 24601
-    factory = WebSocketServerFactory("ws://127.0.0.1:{0}".format(port), debug=False)
-    factory.protocol = runnerWebSocketProtocol(localTargets)
-
-    from twisted.internet import reactor
-    reactor.listenTCP(port, factory)
-
-    t = threading.Thread(target=reactor.run, kwargs={"installSignalHandlers": 0})
-    t.daemon = True
-    t.start()
+import runner
 
 from nupic.data.inference_shifter import InferenceShifter
 from nupic.frameworks.opf.metrics import MetricSpec
+from nupic.frameworks.opf.modelfactory import ModelFactory
 from nupic.frameworks.opf.predictionmetricsmanager import MetricsManager
 
 import matplotlib
@@ -64,7 +34,7 @@ _METRIC_SPECS = (
 )
 
 if __name__ == '__main__':
-    from nupic.frameworks.opf.modelfactory import ModelFactory
+    from swarmed_model_params import MODEL_PARAMS
     model = ModelFactory.create(MODEL_PARAMS)
     model.enableInference({"predictedField": "kw_energy_consumption"})
 
@@ -172,5 +142,5 @@ if __name__ == '__main__':
             ["power consumption (kW)", consumptionStr],
         ])
 
-    startRunner(model, step)
+    runner.startRunner(model, step, 24601, useBackgroundThread=True)
     plt.show()
