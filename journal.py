@@ -272,7 +272,11 @@ class Journal(object):
 
             if selCell is not None and selSegIdx is not None:
                 ret[selCell][Keyword("selected-cell?")] = True
-                ret[selCell][Keyword("segments")][selSegIdx][Keyword("selected-seg?")] = True
+                # Because a client can select a segment and step backward and
+                # forward in time, it may be requesting a segment that doesn't
+                # exist in this timestep, or one that we've optimized away.
+                if selSegIdx in ret[selCell][Keyword("segments")]:
+                    ret[selCell][Keyword("segments")][selSegIdx][Keyword("selected-seg?")] = True
 
             responseChannel.put({
                 Keyword("distal"): ret,
