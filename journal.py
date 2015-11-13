@@ -98,7 +98,11 @@ class Journal(object):
 
         sp = model._getSPRegion().getSelf()._sfdr
         self.inputDimensions = sp.getInputDimensions()
+        if isinstance(self.inputDimensions, numpy.ndarray):
+            self.inputDimensions = self.inputDimensions.tolist()
         self.columnDimensions = sp.getColumnDimensions()
+        if isinstance(self.columnDimensions, numpy.ndarray):
+            self.columnDimensions = self.columnDimensions.tolist()
 
         self.cellsPerColumn = model._getTPRegion().getSelf()._tfdr.cellsPerColumn
 
