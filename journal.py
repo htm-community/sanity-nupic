@@ -13,6 +13,8 @@ def getBitStates(model):
         "activeBits": spRegion._spatialPoolerInput.nonzero()[0].tolist(),
         "activeColumns": spOutput.nonzero()[0].tolist(),
         "activeCells": tp.getActiveState().nonzero()[0].tolist(),
+        "nDistalLearningThreshold": tp.minThreshold,
+        "nDistalStimulusThreshold": tp.activationThreshold,
         "predictedCells": npPredictedCells.tolist(),
         "predictedColumns": numpy.unique(npPredictedCells / tp.cellsPerColumn).tolist(),
     }
@@ -45,42 +47,78 @@ def getDistalSegments(model, columnsToCheck, onlyTargets, onlyConnected=True):
 
     for col in columnsToCheck:
         for cell in range(tp.cellsPerColumn):
-            for segIdx in range(tp.getNumSegmentsInCell(col, cell)):
-                v = tp.getSegmentOnCell(col, cell, segIdx)
-                segData = v[0]
-                synapses = []
-                nConnectedActive = 0
-                nConnectedTotal = 0
-                nDisconnectedActive = 0
-                nDisconnectedTotal = 0
-                for targetCol, targetCell, perm in v[1:]:
-                    cellId = targetCol * tp.cellsPerColumn + targetCell
-                    isConnected = perm >= tp.connectedPerm
-                    isActive = cellId in onlyTargets
+            if hasattr(tp, "connections"):
+                # temporal_memory.py
+                for seg in tp.connections.segmentsForCell(col * tp.cellsPerColumn + cell):
+                    synapses = []
+                    nConnectedActive = 0
+                    nConnectedTotal = 0
+                    nDisconnectedActive = 0
+                    nDisconnectedTotal = 0
+                    for syn in tp.connections.synapsesForSegment(seg):
+                        synapseData = tp.connections.dataForSynapse(syn)
+                        isConnected = synapseData.permanence >= tp.connectedPermanence
+                        isActive = synapseData.presynapticCell in onlyTargets
 
-                    if isConnected:
-                        nConnectedTotal += 1
-                    else:
-                        nDisconnectedTotal += 1
-
-                    if isActive:
                         if isConnected:
-                            nConnectedActive += 1
-                            syn = (targetCol, targetCell, perm)
-                            synapses.append(syn)
+                            nConnectedTotal += 1
                         else:
-                            nDisconnectedActive += 1
-                distalSegments.append({
-                    "column": col,
-                    "cell": cell,
-                    "synapses": synapses,
-                    "nConnectedActive": nConnectedActive,
-                    "nConnectedTotal": nConnectedTotal,
-                    "nDisconnectedActive": nDisconnectedActive,
-                    "nDisconnectedTotal": nDisconnectedTotal,
-                    "nLearningThreshold": tp.minThreshold, # TODO don't do per-segment
-                    "nStimulusThreshold": tp.activationThreshold, # TODO don't do per-segment
-                })
+                            nDisconnectedTotal += 1
+
+                        if isActive:
+                            if isConnected:
+                                nConnectedActive += 1
+                                presynapticCol = synapseData.presynapticCell / tp.cellsPerColumn
+                                presynapticCellOffset = synapseData.presynapticCell % tp.cellsPerColumn
+                                syn = (presynapticCol, presynapticCellOffset, synapseData.permanence)
+                                synapses.append(syn)
+                            else:
+                                nDisconnectedActive += 1
+                    distalSegments.append({
+                        "column": col,
+                        "cell": cell,
+                        "synapses": synapses,
+                        "nConnectedActive": nConnectedActive,
+                        "nConnectedTotal": nConnectedTotal,
+                        "nDisconnectedActive": nDisconnectedActive,
+                        "nDisconnectedTotal": nDisconnectedTotal,
+                    })
+            else:
+                # tm.py
+                for segIdx in range(tp.getNumSegmentsInCell(col, cell)):
+                    v = tp.getSegmentOnCell(col, cell, segIdx)
+                    segData = v[0]
+                    synapses = []
+                    nConnectedActive = 0
+                    nConnectedTotal = 0
+                    nDisconnectedActive = 0
+                    nDisconnectedTotal = 0
+                    for targetCol, targetCell, perm in v[1:]:
+                        cellId = targetCol * tp.cellsPerColumn + targetCell
+                        isConnected = perm >= tp.connectedPerm
+                        isActive = cellId in onlyTargets
+
+                        if isConnected:
+                            nConnectedTotal += 1
+                        else:
+                            nDisconnectedTotal += 1
+
+                        if isActive:
+                            if isConnected:
+                                nConnectedActive += 1
+                                syn = (targetCol, targetCell, perm)
+                                synapses.append(syn)
+                            else:
+                                nDisconnectedActive += 1
+                    distalSegments.append({
+                        "column": col,
+                        "cell": cell,
+                        "synapses": synapses,
+                        "nConnectedActive": nConnectedActive,
+                        "nConnectedTotal": nConnectedTotal,
+                        "nDisconnectedActive": nDisconnectedActive,
+                        "nDisconnectedTotal": nDisconnectedTotal,
+                    })
 
     return distalSegments
 
@@ -139,6 +177,7 @@ class Journal(object):
             modelData["distalSegments"] = getDistalSegments(model, columnsToCheck, prevActiveCells)
         else:
             modelData["distalSegments"] = []
+
         self.journal.append(modelData)
 
         # TODO: only keep nKeepSteps models
@@ -254,8 +293,8 @@ class Journal(object):
                         Keyword("n-conn-tot"): seg["nConnectedTotal"],
                         Keyword("n-disc-act"): seg["nDisconnectedActive"],
                         Keyword("n-disc-tot"): seg["nDisconnectedTotal"],
-                        Keyword("stimulus-th"): seg["nStimulusThreshold"],
-                        Keyword("learning-th"): seg["nLearningThreshold"],
+                        Keyword("stimulus-th"): modelData["nDistalStimulusThreshold"],
+                        Keyword("learning-th"): modelData["nDistalLearningThreshold"],
                         Keyword("syns-by-state"): {
                             Keyword("active"): activeSynapses,
                         },
