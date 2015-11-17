@@ -8,7 +8,7 @@ from twisted.python import log
 
 from simulation import Simulation
 from journal import Journal
-from websocket import runnerWebSocketProtocol
+from websocket import makeVizWebSocketClass
 
 def startRunner(model, stepfn, port, useBackgroundThread=False):
     journal = Journal(model)
@@ -22,7 +22,7 @@ def startRunner(model, stepfn, port, useBackgroundThread=False):
 
     port = 24601
     factory = WebSocketServerFactory("ws://127.0.0.1:{0}".format(port), debug=False)
-    factory.protocol = runnerWebSocketProtocol(localTargets)
+    factory.protocol = makeVizWebSocketClass(localTargets)
     log.startLogging(sys.stdout)
     reactor.listenTCP(port, factory)
 

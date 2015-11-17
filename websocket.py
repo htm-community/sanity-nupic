@@ -28,17 +28,17 @@ class WebSocketChannelProxy(object):
         reactor.callFromThread(WebSocketServerProtocol.sendMessage,
                                self.websocket, serialized, False)
 
-def channelProxyHandler(websocket):
-    class ChannelProxyHandler(object):
-        @staticmethod
-        def from_rep(v):
-            channel_proxy = WebSocketChannelProxy(v, websocket)
-            return channel_proxy
+class WebSocketChannelProxyHandler(object):
+    def __init__(self, websocket):
+        self.websocket = websocket
 
-    return ChannelProxyHandler
+    def from_rep(self, v):
+        return WebSocketChannelProxy(v, self.websocket)
 
-def runnerWebSocketProtocol(localTargets):
-    class RunnerWebSocket(WebSocketServerProtocol):
+# twisted wants a class, not an object. We need to give the object
+# parameters of our own. So we use a closure.
+def makeVizWebSocketClass(localTargets):
+    class VizWebSocket(WebSocketServerProtocol):
         def onConnect(self, request):
             print("Client connecting: {0}".format(request.peer))
 
@@ -50,7 +50,7 @@ def runnerWebSocketProtocol(localTargets):
                 print("Binary message received: {0} bytes".format(len(payload)))
             else:
                 reader = Reader("json")
-                reader.register("ChannelProxy", channelProxyHandler(self))
+                reader.register("ChannelProxy", WebSocketChannelProxyHandler(self))
                 msg = reader.read(StringIO(payload))
 
                 target, cmd, val = msg
@@ -63,4 +63,4 @@ def runnerWebSocketProtocol(localTargets):
         def onClose(self, wasClean, code, reason):
             print("WebSocket connection closed: {0}".format(reason))
 
-    return RunnerWebSocket
+    return VizWebSocket
