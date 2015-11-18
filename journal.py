@@ -26,22 +26,20 @@ class Journal(object):
             },
         }
 
-        self.cellsPerColumn = vizModel.getCellsPerColumn() # TODO gross
-
         self.absorbStepTemplate(vizModel)
         self.append(vizModel)
         vizModel.addEventListener('didStep', lambda: self.append(vizModel))
 
     def absorbStepTemplate(self, vizModel):
-        network = vizModel.getNetworkLayout()
+        self.stepTemplate = vizModel.query(networkLayout=True)
         senses = {}
-        for name, senseData in network["senses"].items():
+        for name, senseData in self.stepTemplate["senses"].items():
             senses[Keyword(name)] = {
                 Keyword("dimensions"): senseData["dimensions"],
             }
 
         regions = {}
-        for regionName, regionData in network["regions"].items():
+        for regionName, regionData in self.stepTemplate["regions"].items():
             region = {}
             for layerName, layerData in regionData.items():
                 region[Keyword(layerName)] = {
@@ -49,31 +47,58 @@ class Journal(object):
                 }
             regions[Keyword(regionName)] = region
 
-        self.stepTemplate = {
+        self.stepTemplateEncoded = {
             Keyword("senses"): senses,
             Keyword("regions"): regions,
         }
 
     def append(self, vizModel):
-        modelData = vizModel.getBitStates()
+        queryArgs = {
+            'bitStates': True,
+        }
+
+        if self.captureOptions[Keyword("ff-synapses")][Keyword("capture?")]:
+            proximalSynapsesQuery = {
+                'onlyActive': True,
+                'onlyConnected': True,
+            }
+            queryArgs.update({
+                'proximalSynapses': True,
+                'proximalSynapsesQuery': {
+                    'onlyActive': True,
+                    'onlyConnected': True,
+                },
+            })
+
+        if (len(self.journal) > 0 and
+            self.captureOptions[Keyword("distal-synapses")][Keyword("capture?")]):
+
+            distalSegmentsQuery = {
+                'senses': {},
+                'regions': {},
+            }
+
+            for senseName, prevSenseData in self.journal[-1]['senses'].items():
+                distalSegmentsQuery['senses'][senseName] = {
+                    'targets': prevSenseData['activeBits'],
+                }
+
+            for regionName, prevRegionData in self.journal[-1]['regions'].items():
+                distalSegmentsQuery['regions'][regionName] = {}
+                for layerName, prevLayerData in prevRegionData.items():
+                    distalSegmentsQuery['regions'][regionName][layerName] = {
+                        'targets': prevLayerData['activeCells'],
+                        'additionalColumns': prevLayerData['predictedColumns'],
+                    }
+
+            queryArgs.update({
+                'distalSegments': True,
+                'distalSegmentsQuery': distalSegmentsQuery,
+            })
 
         # TODO: grab the specified synapse types
 
-        if self.captureOptions[Keyword("ff-synapses")][Keyword("capture?")]:
-            modelData["proximalSynapses"] = vizModel.getProximalSynapses(modelData["activeBits"])
-        else:
-            modelData["proximalSynapses"] = []
-        if len(self.journal) > 0 and \
-           self.captureOptions[Keyword("distal-synapses")][Keyword("capture?")]:
-
-            prevActiveCells = self.journal[-1]["activeCells"]
-            prevPredictedColumns = self.journal[-1]["predictedColumns"]
-            columnsToCheck = modelData["activeColumns"] + prevPredictedColumns
-            modelData["distalSegments"] = vizModel.getDistalSegments(columnsToCheck, prevActiveCells)
-        else:
-            modelData["distalSegments"] = []
-
-        self.journal.append(modelData)
+        self.journal.append(vizModel.query(**queryArgs))
 
         # TODO: only keep nKeepSteps models
 
@@ -97,7 +122,7 @@ class Journal(object):
 
             self.subscribers.append(stepsChannel)
 
-            responseChannel.put([self.stepTemplate, self.captureOptions])
+            responseChannel.put([self.stepTemplateEncoded, self.captureOptions])
         elif command == "get-cells-segments":
             modelId, rgnId, lyrId, col, ci_si, token, responseChannel = args
 
@@ -107,25 +132,30 @@ class Journal(object):
                 cell, segIdx = ci_si
 
             modelData = self.journal[modelId]
+            layerData = modelData['regions'][str(rgnId)][str(lyrId)]
+            cellsPerColumn = self.stepTemplate['regions'][str(rgnId)][str(lyrId)]['cellsPerColumn']
 
-            lower = col * self.cellsPerColumn
-            upper = (col + 1) * self.cellsPerColumn
+            lower = col * cellsPerColumn
+            upper = (col + 1) * cellsPerColumn
 
-            ac = filter(lambda x: (x >= lower and x < upper), modelData["activeCells"])
+            ac = filter(lambda x: (x >= lower and x < upper), layerData["activeCells"])
             pc = []
             if modelId > 0:
+                prevModelData = self.journal[modelId - 1]
+                prevLayerData = prevModelData['regions'][str(rgnId)][str(lyrId)]
                 pc = filter(lambda x: (x >= lower and x < upper),
-                            self.journal[modelId - 1]["predictedCells"])
+                            prevLayerData['predictedCells'])
+
             ret = {}
 
             colSegs = filter(lambda x: (x["column"] == col),
-                             modelData["distalSegments"])
+                             layerData.get("distalSegments", []))
 
             connectedActiveMax = -1
             cellWithMax = None
             segIdxWithMax = None
 
-            for i in range(self.cellsPerColumn):
+            for i in range(cellsPerColumn):
                 isActive = (i + lower) in ac
                 isPredicted = (i + lower) in pc
                 cellState = None
@@ -146,8 +176,7 @@ class Journal(object):
 
                 segs = {}
                 segIdx = -1 # HACK, it's gross that viz requires an index
-                for seg in filter(lambda x: (x["cell"] == i),
-                                  colSegs):
+                for seg in filter(lambda x: (x["cell"] == i), colSegs):
                     segIdx += 1
 
                     # TODO only send synapses according to viz-options
@@ -172,8 +201,8 @@ class Journal(object):
                         Keyword("n-conn-tot"): seg["nConnectedTotal"],
                         Keyword("n-disc-act"): seg["nDisconnectedActive"],
                         Keyword("n-disc-tot"): seg["nDisconnectedTotal"],
-                        Keyword("stimulus-th"): modelData["nDistalStimulusThreshold"],
-                        Keyword("learning-th"): modelData["nDistalLearningThreshold"],
+                        Keyword("stimulus-th"): layerData["nDistalStimulusThreshold"],
+                        Keyword("learning-th"): layerData["nDistalLearningThreshold"],
                         Keyword("syns-by-state"): {
                             Keyword("active"): activeSynapses,
                         },
@@ -207,13 +236,17 @@ class Journal(object):
         elif command == "get-ff-in-synapses":
             modelId, rgnId, lyrId, onlyColumns, token, responseChannel = args
             modelData = self.journal[modelId]
-            proximalSynapses = modelData["proximalSynapses"]
-            activeBits = modelData["activeBits"]
+            proximalSynapses = modelData["regions"][str(rgnId)][str(lyrId)].get(
+                'proximalSynapses', [])
+
+            # TODO this is still assuming it's the inbits
+            # TODO this is still hardcoding a particular input
+            activeBits = modelData['senses']['concatenated']['activeBits']
 
             synapsesByColumn = {}
 
             for column, inputBit, perm in proximalSynapses:
-                if column in onlyColumns and inputBit in activeBits:
+                if column in onlyColumns:
                     if column not in synapsesByColumn:
                         synapsesByColumn[column] = []
                     synapsesByColumn[column].append({
@@ -232,25 +265,31 @@ class Journal(object):
             modelId, token, responseChannel = args
             modelData = self.journal[modelId]
 
-            predColumns = None
-            if modelId > 0:
-                predColumns = self.journal[modelId - 1]["predictedColumns"]
+            response = {
+                Keyword("senses"): {},
+                Keyword("regions"): {},
+            }
 
-            responseChannel.put({
-                Keyword("senses"): {
-                    Keyword("concatenated"): {
-                        Keyword("active-bits"): modelData["activeBits"],
-                    },
-                },
-                Keyword("regions"): {
-                    Keyword("rgn-0"): {
-                        Keyword("layer-3"): {
-                            Keyword("active-columns"): modelData["activeColumns"],
-                            Keyword("pred-columns"): predColumns,
-                        },
-                    },
-                },
-            })
+            for senseName, senseData in modelData["senses"].items():
+                response[Keyword("senses")][Keyword(senseName)] = {
+                    Keyword("active-bits"): senseData["activeBits"],
+                }
+
+            for regionName, regionData in modelData["regions"].items():
+                response[Keyword("regions")][Keyword(regionName)] = {}
+                for layerName, layerData in regionData.items():
+                    prevPredColumns = None
+                    if modelId > 0:
+                        prevModelData = self.journal[modelId - 1]
+                        prevLayerData = prevModelData['regions'][regionName][layerName]
+                        prevPredColumns = prevLayerData['predictedColumns']
+                    response[Keyword("regions")][Keyword(regionName)][Keyword(layerName)] = {
+                        Keyword("active-columns"): layerData["activeColumns"],
+                        Keyword("pred-columns"): prevPredColumns
+                    }
+
+            responseChannel.put(response)
+
         elif command == "set-capture-options":
             captureOptions, = args
             self.captureOptions = captureOptions
