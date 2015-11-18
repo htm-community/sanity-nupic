@@ -74,11 +74,11 @@ class VizModel(object):
         """
 
 
-class OpfVizModel(VizModel):
+class CLAVizModel(VizModel):
     __metaclass__ = ABCMeta
 
     def __init__(self, model):
-        super(OpfVizModel, self).__init__()
+        super(CLAVizModel, self).__init__()
         self.model = model
 
     def getNetworkLayout(self):

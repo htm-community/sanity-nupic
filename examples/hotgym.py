@@ -4,7 +4,7 @@ import os, sys
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 import runner
-from model import OpfVizModel
+from model import CLAVizModel
 from swarmed_model_params import MODEL_PARAMS
 
 from nupic.frameworks.opf.metrics import MetricSpec
@@ -26,7 +26,7 @@ _METRIC_SPECS = (
                params={'errorMetric': 'altMAPE', 'window': 1000, 'steps': 1}),
 )
 
-class HotGym(OpfVizModel):
+class HotGym(CLAVizModel):
     def __init__(self, model, inputs):
         super(HotGym, self).__init__(model)
         self.model = model

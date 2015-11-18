@@ -7,7 +7,7 @@ import os, sys
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 import runner
-from model import OpfVizModel
+from model import CLAVizModel
 from swarmed_model_params import MODEL_PARAMS
 
 from nupic.data.inference_shifter import InferenceShifter
@@ -38,7 +38,7 @@ _METRIC_SPECS = (
 
 WINDOW = 100
 
-class HotGym(OpfVizModel):
+class HotGym(CLAVizModel):
     def __init__(self, model, inputs):
         super(HotGym, self).__init__(model)
         self.model = model
