@@ -112,8 +112,9 @@ class CLAVizModel(VizModel):
                         proximalSynapses.append(syn)
 
             regions['rgn-0']['layer-3'].update({
-                'proximalSource': ['senses', 'concatenated'],
-                'proximalSynapses': proximalSynapses,
+                'proximalSynapses': {
+                    ('senses', 'concatenated'): proximalSynapses,
+                }
             })
 
         if distalSegments:

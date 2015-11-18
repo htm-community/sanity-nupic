@@ -240,34 +240,34 @@ class Journal(object):
             modelData = self.journal[modelId]
             layerData = modelData["regions"][str(rgnId)][str(lyrId)]
             proximalSynapses = layerData.get('proximalSynapses', [])
-            proximalSource = layerData.get('proximalSource', None)
-
-            synapseTemplate = {}
-            activeBits = []
-            if proximalSource:
-                synapseTemplate[Keyword('src-id')] = Keyword(proximalSource[1])
-                if proximalSource[0] == 'senses':
-                    senseData = modelData['senses'][proximalSource[1]]
-                    activeBits = senseData['activeBits']
-                elif proximalSource[0] == 'regions':
-                    synapseTemplate[Keyword('src-lyr')] = Keyword(proximalSource[2])
-                    sourceLayerData = modelData['regions'][proximalSource[1]][proximalSource[2]]
-                    activeBits = sourceLayerData['activeCells']
 
             synapsesByColumn = {}
 
-            for column, inputBit, perm in proximalSynapses:
-                if column in onlyColumns and inputBit in activeBits:
-                    if column not in synapsesByColumn:
-                        synapsesByColumn[column] = []
+            for sourcePath, synapses in proximalSynapses.items():
+                synapseTemplate = {}
+                activeBits = []
+                if sourcePath:
+                    synapseTemplate[Keyword('src-id')] = Keyword(sourcePath[1])
+                    if sourcePath[0] == 'senses':
+                        senseData = modelData['senses'][sourcePath[1]]
+                        activeBits = senseData['activeBits']
+                    elif sourcePath[0] == 'regions':
+                        synapseTemplate[Keyword('src-lyr')] = Keyword(sourcePath[2])
+                        sourceLayerData = modelData['regions'][sourcePath[1]][sourcePath[2]]
+                        activeBits = sourceLayerData['activeCells']
 
-                    syn = synapseTemplate.copy()
-                    syn.update({
-                        Keyword("src-col"): inputBit,
-                        Keyword("syn-state"): Keyword("active"),
-                        Keyword("perm"): perm,
-                    })
-                    synapsesByColumn[column].append(syn)
+                for column, inputBit, perm in synapses:
+                    if column in onlyColumns and inputBit in activeBits:
+                        if column not in synapsesByColumn:
+                            synapsesByColumn[column] = []
+
+                        syn = synapseTemplate.copy()
+                        syn.update({
+                            Keyword("src-col"): inputBit,
+                            Keyword("syn-state"): Keyword("active"),
+                            Keyword("perm"): perm,
+                        })
+                        synapsesByColumn[column].append(syn)
 
             ret = {}
             for column, synapses in synapsesByColumn.items():
