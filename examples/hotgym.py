@@ -39,7 +39,7 @@ class HotGym(CLAVizModel):
 
     def step(self):
         self.counter += 1
-        self.timestampStr, self.consumptionStr = csvReader.next()
+        self.timestampStr, self.consumptionStr = self.inputs.next()
         timestamp = datetime.datetime.strptime(self.timestampStr, "%m/%d/%y %H:%M")
         consumption = float(self.consumptionStr)
         result = self.model.run({
