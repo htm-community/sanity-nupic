@@ -40,7 +40,7 @@ In another terminal window, choose and run a demo:
 python examples/hotgym.py
 
 # I recommend this one, but I don't want to help you install matplotlib.
-# python examples/hotgym-plot.py
+# python examples/hotgym_plotted.py
 ~~~
 
 Navigate to http://localhost:8000
