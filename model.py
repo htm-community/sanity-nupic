@@ -37,8 +37,8 @@ class VizModel(object):
         """
 
     @abstractmethod
-    def query(self, networkLayout=False, bitStates=False, proximalSynapses=False,
-              proximalSynapsesQuery={}, distalSegments=False, distalSegmentsQuery={}):
+    def query(self, getNetworkLayout=False, getBitStates=False, getProximalSynapses=False,
+              proximalSynapsesQuery={}, getDistalSegments=False, distalSegmentsQuery={}):
         """
         """
 
@@ -55,8 +55,8 @@ class CLAVizModel(VizModel):
         super(CLAVizModel, self).__init__()
         self.model = model
 
-    def query(self, networkLayout=False, bitStates=False, proximalSynapses=False,
-              proximalSynapsesQuery={}, distalSegments=False, distalSegmentsQuery={}):
+    def query(self, getNetworkLayout=False, getBitStates=False, getProximalSynapses=False,
+              proximalSynapsesQuery={}, getDistalSegments=False, distalSegmentsQuery={}):
         senses = {'concatenated': {}}
         regions = {'rgn-0': {'layer-3': {}}}
 
@@ -65,7 +65,7 @@ class CLAVizModel(VizModel):
         sp = spRegion._sfdr
         tp = self.model._getTPRegion().getSelf()._tfdr
 
-        if networkLayout:
+        if getNetworkLayout:
             inputDimensions = sp.getInputDimensions()
             columnDimensions = sp.getColumnDimensions()
             # The python spatial pooler returns a numpy array.
@@ -79,7 +79,7 @@ class CLAVizModel(VizModel):
                 'cellsPerColumn': tp.cellsPerColumn
             })
 
-        if bitStates:
+        if getBitStates:
             senses['concatenated'].update({
                 'activeBits': spRegion._spatialPoolerInput.nonzero()[0].tolist()
             })
@@ -91,8 +91,8 @@ class CLAVizModel(VizModel):
                 "predictedColumns": numpy.unique(npPredictedCells / tp.cellsPerColumn).tolist(),
             })
 
-        if proximalSynapses:
-            assert bitStates
+        if getProximalSynapses:
+            assert getBitStates
 
             proximalSynapses = deque()
 
@@ -117,8 +117,8 @@ class CLAVizModel(VizModel):
                 }
             })
 
-        if distalSegments:
-            assert bitStates
+        if getDistalSegments:
+            assert getBitStates
 
             distalSegments = deque()
 

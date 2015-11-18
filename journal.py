@@ -31,7 +31,7 @@ class Journal(object):
         vizModel.addEventListener('didStep', lambda: self.append(vizModel))
 
     def absorbStepTemplate(self, vizModel):
-        self.stepTemplate = vizModel.query(networkLayout=True)
+        self.stepTemplate = vizModel.query(getNetworkLayout=True)
         senses = {}
         for name, senseData in self.stepTemplate["senses"].items():
             senses[Keyword(name)] = {
@@ -54,7 +54,7 @@ class Journal(object):
 
     def append(self, vizModel):
         queryArgs = {
-            'bitStates': True,
+            'getBitStates': True,
         }
 
         if self.captureOptions[Keyword("ff-synapses")][Keyword("capture?")]:
@@ -63,7 +63,7 @@ class Journal(object):
                 'onlyConnected': True,
             }
             queryArgs.update({
-                'proximalSynapses': True,
+                'getProximalSynapses': True,
                 'proximalSynapsesQuery': {
                     'onlyActive': True,
                     'onlyConnected': True,
@@ -92,7 +92,7 @@ class Journal(object):
                     }
 
             queryArgs.update({
-                'distalSegments': True,
+                'getDistalSegments': True,
                 'distalSegmentsQuery': distalSegmentsQuery,
             })
 
