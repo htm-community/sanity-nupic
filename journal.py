@@ -1,149 +1,16 @@
-import numpy
-from collections import deque
-from nupic.bindings.math import GetNTAReal
 from transit.transit_types import Keyword
 
-def getBitStates(model):
-    spRegion = model._getSPRegion().getSelf()
-    spOutput = spRegion._spatialPoolerOutput
-    tp = model._getTPRegion().getSelf()._tfdr
-    npPredictedCells = tp.getPredictedState().reshape(-1).nonzero()[0]
-
-    return {
-        "activeBits": spRegion._spatialPoolerInput.nonzero()[0].tolist(),
-        "activeColumns": spOutput.nonzero()[0].tolist(),
-        "activeCells": tp.getActiveState().nonzero()[0].tolist(),
-        "nDistalLearningThreshold": tp.minThreshold,
-        "nDistalStimulusThreshold": tp.activationThreshold,
-        "predictedCells": npPredictedCells.tolist(),
-        "predictedColumns": numpy.unique(npPredictedCells / tp.cellsPerColumn).tolist(),
-    }
-
-def getProximalSynapses(model, onlyBits, onlyConnected=True):
-    proximalSynapses = deque()
-    spRegion = model._getSPRegion().getSelf()
-    sp = spRegion._sfdr
-    tpRegion = model._getTPRegion()
-    tp = tpRegion.getSelf()._tfdr
-
-    numColumns = sp.getNumColumns()
-    numInputs = sp.getNumInputs()
-    permanence = numpy.zeros(numInputs).astype(GetNTAReal())
-    for column in range(numColumns):
-        sp.getPermanence(column, permanence)
-        for inputBit in onlyBits:
-            if not onlyConnected or permanence[inputBit] >= spRegion.synPermConnected:
-                syn = (column, int(inputBit), permanence[inputBit].tolist())
-                proximalSynapses.append(syn)
-
-    return proximalSynapses
-
-def getDistalSegments(model, columnsToCheck, onlyTargets, onlyConnected=True):
-    spRegion = model._getSPRegion().getSelf()
-    sp = spRegion._sfdr
-    tp = model._getTPRegion().getSelf()._tfdr
-
-    distalSegments = deque()
-
-    for col in columnsToCheck:
-        for cell in range(tp.cellsPerColumn):
-            if hasattr(tp, "connections"):
-                # temporal_memory.py
-                for seg in tp.connections.segmentsForCell(col * tp.cellsPerColumn + cell):
-                    synapses = []
-                    nConnectedActive = 0
-                    nConnectedTotal = 0
-                    nDisconnectedActive = 0
-                    nDisconnectedTotal = 0
-                    for syn in tp.connections.synapsesForSegment(seg):
-                        synapseData = tp.connections.dataForSynapse(syn)
-                        isConnected = synapseData.permanence >= tp.connectedPermanence
-                        isActive = synapseData.presynapticCell in onlyTargets
-
-                        if isConnected:
-                            nConnectedTotal += 1
-                        else:
-                            nDisconnectedTotal += 1
-
-                        if isActive:
-                            if isConnected:
-                                nConnectedActive += 1
-                                presynapticCol = synapseData.presynapticCell / tp.cellsPerColumn
-                                presynapticCellOffset = synapseData.presynapticCell % tp.cellsPerColumn
-                                syn = (presynapticCol, presynapticCellOffset, synapseData.permanence)
-                                synapses.append(syn)
-                            else:
-                                nDisconnectedActive += 1
-                    distalSegments.append({
-                        "column": col,
-                        "cell": cell,
-                        "synapses": synapses,
-                        "nConnectedActive": nConnectedActive,
-                        "nConnectedTotal": nConnectedTotal,
-                        "nDisconnectedActive": nDisconnectedActive,
-                        "nDisconnectedTotal": nDisconnectedTotal,
-                    })
-            else:
-                # tm.py
-                for segIdx in range(tp.getNumSegmentsInCell(col, cell)):
-                    v = tp.getSegmentOnCell(col, cell, segIdx)
-                    segData = v[0]
-                    synapses = []
-                    nConnectedActive = 0
-                    nConnectedTotal = 0
-                    nDisconnectedActive = 0
-                    nDisconnectedTotal = 0
-                    for targetCol, targetCell, perm in v[1:]:
-                        cellId = targetCol * tp.cellsPerColumn + targetCell
-                        isConnected = perm >= tp.connectedPerm
-                        isActive = cellId in onlyTargets
-
-                        if isConnected:
-                            nConnectedTotal += 1
-                        else:
-                            nDisconnectedTotal += 1
-
-                        if isActive:
-                            if isConnected:
-                                nConnectedActive += 1
-                                syn = (targetCol, targetCell, perm)
-                                synapses.append(syn)
-                            else:
-                                nDisconnectedActive += 1
-                    distalSegments.append({
-                        "column": col,
-                        "cell": cell,
-                        "synapses": synapses,
-                        "nConnectedActive": nConnectedActive,
-                        "nConnectedTotal": nConnectedTotal,
-                        "nDisconnectedActive": nDisconnectedActive,
-                        "nDisconnectedTotal": nDisconnectedTotal,
-                    })
-
-    return distalSegments
-
-def makeStep(model, modelId):
+def makeStep(vizModel, modelId):
     return {
         Keyword("model-id"): modelId,
-        Keyword("timestep"): modelId, # hack
+        Keyword("timestep"): vizModel.timestep,
     }
 
 class Journal(object):
-    def __init__(self, model):
+    def __init__(self, vizModel):
         self.journal = []
         self.subscribers = []
         self.nextModelId = 0
-
-        sp = model._getSPRegion().getSelf()._sfdr
-        self.inputDimensions = sp.getInputDimensions()
-        if isinstance(self.inputDimensions, numpy.ndarray):
-            self.inputDimensions = self.inputDimensions.tolist()
-        self.columnDimensions = sp.getColumnDimensions()
-        if isinstance(self.columnDimensions, numpy.ndarray):
-            self.columnDimensions = self.columnDimensions.tolist()
-
-        self.cellsPerColumn = model._getTPRegion().getSelf()._tfdr.cellsPerColumn
-
         self.captureOptions = {
             Keyword("keep-steps"): 50,
             Keyword("ff-synapses"): {
@@ -159,13 +26,41 @@ class Journal(object):
             },
         }
 
-    def append(self, model, displayValue=None):
-        modelData = getBitStates(model)
+        self.cellsPerColumn = vizModel.getCellsPerColumn() # TODO gross
+
+        self.absorbStepTemplate(vizModel)
+        self.append(vizModel)
+        vizModel.addEventListener('didStep', lambda: self.append(vizModel))
+
+    def absorbStepTemplate(self, vizModel):
+        network = vizModel.getNetworkLayout()
+        senses = {}
+        for name, senseData in network["senses"].items():
+            senses[Keyword(name)] = {
+                Keyword("dimensions"): senseData["dimensions"],
+            }
+
+        regions = {}
+        for regionName, regionData in network["regions"].items():
+            region = {}
+            for layerName, layerData in regionData.items():
+                region[Keyword(layerName)] = {
+                    Keyword("dimensions"): layerData["dimensions"],
+                }
+            regions[Keyword(regionName)] = region
+
+        self.stepTemplate = {
+            Keyword("senses"): senses,
+            Keyword("regions"): regions,
+        }
+
+    def append(self, vizModel):
+        modelData = vizModel.getBitStates()
 
         # TODO: grab the specified synapse types
 
         if self.captureOptions[Keyword("ff-synapses")][Keyword("capture?")]:
-            modelData["proximalSynapses"] = getProximalSynapses(model, modelData["activeBits"])
+            modelData["proximalSynapses"] = vizModel.getProximalSynapses(modelData["activeBits"])
         else:
             modelData["proximalSynapses"] = []
         if len(self.journal) > 0 and \
@@ -174,7 +69,7 @@ class Journal(object):
             prevActiveCells = self.journal[-1]["activeCells"]
             prevPredictedColumns = self.journal[-1]["predictedColumns"]
             columnsToCheck = modelData["activeColumns"] + prevPredictedColumns
-            modelData["distalSegments"] = getDistalSegments(model, columnsToCheck, prevActiveCells)
+            modelData["distalSegments"] = vizModel.getDistalSegments(columnsToCheck, prevActiveCells)
         else:
             modelData["distalSegments"] = []
 
@@ -182,11 +77,10 @@ class Journal(object):
 
         # TODO: only keep nKeepSteps models
 
-        step = makeStep(model, self.nextModelId)
+        step = makeStep(vizModel, self.nextModelId)
         self.nextModelId += 1
 
-        if displayValue:
-            step[Keyword("display-value")] = displayValue
+        step[Keyword("display-value")] = vizModel.getInputDisplayText()
 
         for subscriber in self.subscribers:
             subscriber.put(step)
@@ -203,22 +97,7 @@ class Journal(object):
 
             self.subscribers.append(stepsChannel)
 
-            stepTemplate = {
-                Keyword("senses"): {
-                    Keyword("concatenated"): {
-                        Keyword("dimensions"): self.inputDimensions,
-                    },
-                },
-                Keyword("regions"): {
-                    Keyword("rgn-0"): {
-                        Keyword("layer-3"): {
-                            Keyword("dimensions"): self.columnDimensions,
-                        },
-                    },
-                },
-            }
-
-            responseChannel.put([stepTemplate, self.captureOptions])
+            responseChannel.put([self.stepTemplate, self.captureOptions])
         elif command == "get-cells-segments":
             modelId, rgnId, lyrId, col, ci_si, token, responseChannel = args
 
