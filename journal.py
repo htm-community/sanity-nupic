@@ -181,6 +181,8 @@ class Journal(object):
 
                     # TODO only send synapses according to viz-options
                     # e.g. only for selected segment
+
+                    # TODO this is still not ready for hierarchy
                     activeSynapses = []
                     for targetCol, targetCell, perm in seg["synapses"]:
                         activeSynapses.append({
@@ -236,29 +238,40 @@ class Journal(object):
         elif command == "get-ff-in-synapses":
             modelId, rgnId, lyrId, onlyColumns, token, responseChannel = args
             modelData = self.journal[modelId]
-            proximalSynapses = modelData["regions"][str(rgnId)][str(lyrId)].get(
-                'proximalSynapses', [])
+            layerData = modelData["regions"][str(rgnId)][str(lyrId)]
+            proximalSynapses = layerData.get('proximalSynapses', [])
+            proximalSource = layerData.get('proximalSource', None)
 
-            # TODO this is still assuming it's the inbits
-            # TODO this is still hardcoding a particular input
-            activeBits = modelData['senses']['concatenated']['activeBits']
+            synapseTemplate = {}
+            activeBits = []
+            if proximalSource:
+                synapseTemplate[Keyword('src-id')] = Keyword(proximalSource[1])
+                if proximalSource[0] == 'senses':
+                    senseData = modelData['senses'][proximalSource[1]]
+                    activeBits = senseData['activeBits']
+                elif proximalSource[0] == 'regions':
+                    synapseTemplate[Keyword('src-lyr')] = Keyword(proximalSource[2])
+                    sourceLayerData = modelData['regions'][proximalSource[1]][proximalSource[2]]
+                    activeBits = sourceLayerData['activeCells']
 
             synapsesByColumn = {}
 
             for column, inputBit, perm in proximalSynapses:
-                if column in onlyColumns:
+                if column in onlyColumns and inputBit in activeBits:
                     if column not in synapsesByColumn:
                         synapsesByColumn[column] = []
-                    synapsesByColumn[column].append({
-                        Keyword("src-id"): Keyword("concatenated"),
+
+                    syn = synapseTemplate.copy()
+                    syn.update({
                         Keyword("src-col"): inputBit,
                         Keyword("syn-state"): Keyword("active"),
                         Keyword("perm"): perm,
                     })
+                    synapsesByColumn[column].append(syn)
 
             ret = {}
             for column, synapses in synapsesByColumn.items():
-                ret[(Keyword("rgn-0"), Keyword("layer-3"), column)] = synapses
+                ret[(rgnId, lyrId, column)] = synapses
                 responseChannel.put(ret)
 
         elif command == "get-inbits-cols":

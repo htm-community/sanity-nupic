@@ -37,7 +37,8 @@ class VizModel(object):
         """
 
     @abstractmethod
-    def query(self, networkLayout=False):
+    def query(self, networkLayout=False, bitStates=False, proximalSynapses=False,
+              proximalSynapsesQuery={}, distalSegments=False, distalSegmentsQuery={}):
         """
         """
 
@@ -111,6 +112,7 @@ class CLAVizModel(VizModel):
                         proximalSynapses.append(syn)
 
             regions['rgn-0']['layer-3'].update({
+                'proximalSource': ['senses', 'concatenated'],
                 'proximalSynapses': proximalSynapses,
             })
 
