@@ -158,7 +158,9 @@ class CLAVizModel(VizModel):
                             distalSegments.append({
                                 "column": col,
                                 "cell": cell,
-                                "synapses": synapses,
+                                "synapses": {
+                                    ('regions', 'rgn-0', 'layer-3'): synapses,
+                                },
                                 "nConnectedActive": nConnectedActive,
                                 "nConnectedTotal": nConnectedTotal,
                                 "nDisconnectedActive": nDisconnectedActive,
@@ -194,7 +196,9 @@ class CLAVizModel(VizModel):
                             distalSegments.append({
                                 "column": col,
                                 "cell": cell,
-                                "synapses": synapses,
+                                "synapses": {
+                                    ('regions', 'rgn-0', 'layer-3'): synapses,
+                                },
                                 "nConnectedActive": nConnectedActive,
                                 "nConnectedTotal": nConnectedTotal,
                                 "nDisconnectedActive": nDisconnectedActive,

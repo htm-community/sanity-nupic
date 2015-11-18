@@ -126,38 +126,36 @@ class Journal(object):
         elif command == "get-cells-segments":
             modelId, rgnId, lyrId, col, ci_si, token, responseChannel = args
 
-            cell = None
-            segIdx = None
-            if ci_si:
-                cell, segIdx = ci_si
-
             modelData = self.journal[modelId]
             layerData = modelData['regions'][str(rgnId)][str(lyrId)]
-            cellsPerColumn = self.stepTemplate['regions'][str(rgnId)][str(lyrId)]['cellsPerColumn']
+            layerTemplate = self.stepTemplate['regions'][str(rgnId)][str(lyrId)]
+            cellsPerColumn = layerTemplate['cellsPerColumn']
 
-            lower = col * cellsPerColumn
-            upper = (col + 1) * cellsPerColumn
-
-            ac = filter(lambda x: (x >= lower and x < upper), layerData["activeCells"])
-            pc = []
+            firstCellInCol = col * cellsPerColumn
+            activeCellsInCol = [cellId - firstCellInCol
+                                for cellId in layerData["activeCells"]
+                                if (cellId >= firstCellInCol and
+                                    cellId < firstCellInCol + cellsPerColumn)]
+            predictedCellsInCol = []
             if modelId > 0:
                 prevModelData = self.journal[modelId - 1]
                 prevLayerData = prevModelData['regions'][str(rgnId)][str(lyrId)]
-                pc = filter(lambda x: (x >= lower and x < upper),
-                            prevLayerData['predictedCells'])
+                predictedCellsInCol = [cellId - firstCellInCol
+                                       for cellId in prevLayerData['predictedCells']
+                                       if (cellId >= firstCellInCol and
+                                           cellId < firstCellInCol + cellsPerColumn)]
 
-            ret = {}
-
-            colSegs = filter(lambda x: (x["column"] == col),
-                             layerData.get("distalSegments", []))
+            distalSegments = layerData.get("distalSegments", [])
+            colSegs = filter(lambda seg: (seg["column"] == col), distalSegments)
 
             connectedActiveMax = -1
             cellWithMax = None
             segIdxWithMax = None
-
+            ret = {}
             for i in range(cellsPerColumn):
-                isActive = (i + lower) in ac
-                isPredicted = (i + lower) in pc
+                isActive = i in activeCellsInCol
+                isPredicted = i in predictedCellsInCol
+
                 cellState = None
                 if isActive and isPredicted:
                     cellState = "active-predicted"
@@ -176,23 +174,28 @@ class Journal(object):
 
                 segs = {}
                 segIdx = -1 # HACK, it's gross that viz requires an index
-                for seg in filter(lambda x: (x["cell"] == i), colSegs):
+                for segment in filter(lambda seg: seg["cell"] == i, colSegs):
                     segIdx += 1
 
                     # TODO only send synapses according to viz-options
                     # e.g. only for selected segment
-
-                    # TODO this is still not ready for hierarchy
                     activeSynapses = []
-                    for targetCol, targetCell, perm in seg["synapses"]:
-                        activeSynapses.append({
-                            Keyword("src-col"): targetCol,
-                            Keyword("src-id"): Keyword("rgn-0"),
-                            Keyword("src-lyr"): Keyword("layer-3"),
-                            Keyword("perm"): perm,
-                        })
+                    for sourcePath, synapses in segment["synapses"].items():
+                        synapseTemplate = {}
+                        if sourcePath:
+                            synapseTemplate[Keyword('src-id')] = Keyword(sourcePath[1])
+                            if sourcePath[0] == 'regions':
+                                synapseTemplate[Keyword('src-lyr')] = Keyword(sourcePath[2])
 
-                    nConnectedActive = seg["nConnectedActive"]
+                        for targetCol, targetCell, perm in synapses:
+                            syn = synapseTemplate.copy()
+                            syn.update({
+                                Keyword("src-col"): targetCol,
+                                Keyword("perm"): perm,
+                            })
+                            activeSynapses.append(syn)
+
+                    nConnectedActive = segment["nConnectedActive"]
                     if nConnectedActive > connectedActiveMax:
                         connectedActiveMax = nConnectedActive
                         cellWithMax = i
@@ -200,9 +203,9 @@ class Journal(object):
 
                     segData = {
                         Keyword("n-conn-act"): nConnectedActive,
-                        Keyword("n-conn-tot"): seg["nConnectedTotal"],
-                        Keyword("n-disc-act"): seg["nDisconnectedActive"],
-                        Keyword("n-disc-tot"): seg["nDisconnectedTotal"],
+                        Keyword("n-conn-tot"): segment["nConnectedTotal"],
+                        Keyword("n-disc-act"): segment["nDisconnectedActive"],
+                        Keyword("n-disc-tot"): segment["nDisconnectedTotal"],
                         Keyword("stimulus-th"): layerData["nDistalStimulusThreshold"],
                         Keyword("learning-th"): layerData["nDistalLearningThreshold"],
                         Keyword("syns-by-state"): {
@@ -239,7 +242,7 @@ class Journal(object):
             modelId, rgnId, lyrId, onlyColumns, token, responseChannel = args
             modelData = self.journal[modelId]
             layerData = modelData["regions"][str(rgnId)][str(lyrId)]
-            proximalSynapses = layerData.get('proximalSynapses', [])
+            proximalSynapses = layerData.get('proximalSynapses', {})
 
             synapsesByColumn = {}
 
