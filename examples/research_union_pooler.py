@@ -7,15 +7,12 @@ from htmresearch.frameworks.union_temporal_pooling.union_temporal_pooler_experim
     UnionTemporalPoolerExperiment)
 from nupic.data.generators.pattern_machine import PatternMachine
 from nupic.data.generators.sequence_machine import SequenceMachine
-from nupic.bindings.math import GetNTAReal # TODO I should be able to
-                                           # refactor and not need
-                                           # this here.
 
 import os, sys
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 import runner
-from model import VizModel
+from model import VizModel, proximalSynapsesFromSP, distalSegmentsFromTM
 from swarmed_model_params import MODEL_PARAMS
 
 class UnionPoolingExperimentVizModel(VizModel):
@@ -60,7 +57,6 @@ class UnionPoolingExperimentVizModel(VizModel):
 
         tm = self.experiment.tm
         up = self.experiment.up
-        cellsPerColumn = tm.cellsPerColumn
 
         if getNetworkLayout:
             senses['input']['dimensions'] = tm.columnDimensions
@@ -87,7 +83,7 @@ class UnionPoolingExperimentVizModel(VizModel):
             })
 
             predictiveCells = tm.predictiveCells
-            predictiveColumns = set(cell / cellsPerColumn for cell in predictiveCells)
+            predictiveColumns = set(cell / tm.cellsPerColumn for cell in predictiveCells)
             regions['tm']['layer'].update({
                 'activeColumns': activeBits,
                 'activeCells': tm.activeCells,
@@ -106,85 +102,38 @@ class UnionPoolingExperimentVizModel(VizModel):
         if getProximalSynapses:
             assert getBitStates
 
-            onlyTmBits = None
-            if proximalSynapsesQuery['onlyActive']:
-                onlyTmBits = regions['tm']['layer']['activeCells']
-            else:
-                onlyTmBits = tm.numberOfColumns()
-
             # Pseudo-synapses
-            tmSyns = deque((column, column, 1)
-                           for column in range(tm.numberOfColumns()))
+            tmSynapses = deque((column, column, 1)
+                               for column in range(tm.numberOfColumns()))
             regions['tm']['layer'].update({
                 'proximalSynapses': {
-                    ('senses', 'input'): tmSyns,
+                    ('senses', 'input'): tmSynapses,
                 },
             })
 
-            upSyns = deque()
-            permanence = numpy.zeros(up.getNumInputs()).astype(GetNTAReal())
-            for column in range(up.getNumColumns()):
-                up.getPermanence(column, permanence)
-                for inputBit in onlyTmBits:
-                    if not proximalSynapsesQuery['onlyConnected'] or \
-                       permanence[inputBit] >= up.getSynPermConnected():
-                        inputColumn = int(inputBit / cellsPerColumn)
-                        syn = (column, inputColumn, float(permanence[inputBit]))
-                        upSyns.append(syn)
+            onlyTmBits = None
+            if proximalSynapsesQuery['onlyActive']:
+                onlyTmBits = regions['tm']['layer']['activeCells']
+
+            upSynapses = proximalSynapsesFromSP(up, onlyTmBits,
+                                                proximalSynapsesQuery['onlyConnected'],
+                                                targetDepth=tm.cellsPerColumn)
 
             regions['up']['layer'].update({
                 'proximalSynapses': {
-                    ('regions', 'tm', 'layer'): upSyns,
+                    ('regions', 'tm', 'layer'): upSynapses,
                 },
             })
 
         if getDistalSegments:
             assert getBitStates
 
-            distalSegments = deque()
-
             columnsToCheck = (regions['tm']['layer']['activeColumns'] |
                               distalSegmentsQuery['regions']['tm']['layer']['additionalColumns'])
             onlyTargets = distalSegmentsQuery['regions']['tm']['layer']['targets']
 
-            for col in columnsToCheck:
-                for cell in range(cellsPerColumn):
-                    for seg in tm.connections.segmentsForCell(col * cellsPerColumn + cell):
-                        synapses = []
-                        nConnectedActive = 0
-                        nConnectedTotal = 0
-                        nDisconnectedActive = 0
-                        nDisconnectedTotal = 0
-                        for syn in tm.connections.synapsesForSegment(seg):
-                            synapseData = tm.connections.dataForSynapse(syn)
-                            isConnected = synapseData.permanence >= tm.connectedPermanence
-                            isActive = synapseData.presynapticCell in onlyTargets
-
-                            if isConnected:
-                                nConnectedTotal += 1
-                            else:
-                                nDisconnectedTotal += 1
-
-                            if isActive:
-                                if isConnected:
-                                    nConnectedActive += 1
-                                    presynapticCol = synapseData.presynapticCell / cellsPerColumn
-                                    presynapticCellOffset = synapseData.presynapticCell % cellsPerColumn
-                                    syn = (presynapticCol, presynapticCellOffset, synapseData.permanence)
-                                    synapses.append(syn)
-                                else:
-                                    nDisconnectedActive += 1
-                        distalSegments.append({
-                            "column": col,
-                            "cell": cell,
-                            "synapses": {
-                                ('regions', 'tm', 'layer'): synapses,
-                            },
-                            "nConnectedActive": nConnectedActive,
-                            "nConnectedTotal": nConnectedTotal,
-                            "nDisconnectedActive": nDisconnectedActive,
-                            "nDisconnectedTotal": nDisconnectedTotal,
-                        })
+            distalSegments = distalSegmentsFromTM(tm, columnsToCheck, onlyTargets,
+                                                  sourcePath=('regions', 'tm', 'layer'))
 
             regions['tm']['layer'].update({
                 'distalSegments': distalSegments,

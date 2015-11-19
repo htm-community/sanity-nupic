@@ -47,6 +47,111 @@ class VizModel(object):
         """Return the most recent input as a dictionary or a list of key-value pairs.
         """
 
+def proximalSynapsesFromSP(sp, targetBits=None, onlyConnectedSynapses=True, targetDepth=1):
+    if not targetBits:
+        targetBits = range(sp.getNumInputs())
+
+    proximalSynapses = deque()
+    permanence = numpy.zeros(sp.getNumInputs()).astype(GetNTAReal())
+    for column in range(sp.getNumColumns()):
+        sp.getPermanence(column, permanence)
+        for inputBit in targetBits:
+            if not onlyConnectedSynapses or permanence[inputBit] >= sp.getSynPermConnected():
+                targetColumn = int(inputBit / targetDepth)
+                syn = (column, targetColumn, permanence[inputBit])
+                proximalSynapses.append(syn)
+
+    return proximalSynapses
+
+# TODO sourcePath is a hack
+def distalSegmentsFromTM(tm, sourceColumns, targetBits, sourcePath):
+    distalSegments = deque()
+    for col in sourceColumns:
+        for cell in range(tm.cellsPerColumn):
+            for seg in tm.connections.segmentsForCell(col * tm.cellsPerColumn + cell):
+                synapses = []
+                nConnectedActive = 0
+                nConnectedTotal = 0
+                nDisconnectedActive = 0
+                nDisconnectedTotal = 0
+                for syn in tm.connections.synapsesForSegment(seg):
+                    synapseData = tm.connections.dataForSynapse(syn)
+                    isConnected = synapseData.permanence >= tm.connectedPermanence
+                    # TODO not necessarily true
+                    isActive = synapseData.presynapticCell in targetBits
+
+                    if isConnected:
+                        nConnectedTotal += 1
+                    else:
+                        nDisconnectedTotal += 1
+
+                    if isActive:
+                        if isConnected:
+                            nConnectedActive += 1
+                            presynapticCol = synapseData.presynapticCell / tm.cellsPerColumn
+                            presynapticCellOffset = synapseData.presynapticCell % tm.cellsPerColumn
+                            syn = (presynapticCol, presynapticCellOffset, synapseData.permanence)
+                            synapses.append(syn)
+                        else:
+                            nDisconnectedActive += 1
+                distalSegments.append({
+                    "column": col,
+                    "cell": cell,
+                    "synapses": {
+                        sourcePath: synapses,
+                    },
+                    "nConnectedActive": nConnectedActive,
+                    "nConnectedTotal": nConnectedTotal,
+                    "nDisconnectedActive": nDisconnectedActive,
+                    "nDisconnectedTotal": nDisconnectedTotal,
+                })
+
+    return distalSegments
+
+# TODO sourcePath is a hack
+def distalSegmentsFromTP(tp, sourceColumns, targetBits, sourcePath):
+    distalSegments = deque()
+    for col in sourceColumns:
+        for cell in range(tp.cellsPerColumn):
+            for segIdx in range(tp.getNumSegmentsInCell(col, cell)):
+                v = tp.getSegmentOnCell(col, cell, segIdx)
+                segData = v[0]
+                synapses = []
+                nConnectedActive = 0
+                nConnectedTotal = 0
+                nDisconnectedActive = 0
+                nDisconnectedTotal = 0
+                for targetCol, targetCell, perm in v[1:]:
+                    cellId = targetCol * tp.cellsPerColumn + targetCell
+                    isConnected = perm >= tp.connectedPerm
+                    # TODO not necessarily true
+                    isActive = cellId in targetBits
+
+                    if isConnected:
+                        nConnectedTotal += 1
+                    else:
+                        nDisconnectedTotal += 1
+
+                    if isActive:
+                        if isConnected:
+                            nConnectedActive += 1
+                            syn = (targetCol, targetCell, perm)
+                            synapses.append(syn)
+                        else:
+                            nDisconnectedActive += 1
+                distalSegments.append({
+                    "column": col,
+                    "cell": cell,
+                    "synapses": {
+                        sourcePath: synapses,
+                    },
+                    "nConnectedActive": nConnectedActive,
+                    "nConnectedTotal": nConnectedTotal,
+                    "nDisconnectedActive": nDisconnectedActive,
+                    "nDisconnectedTotal": nDisconnectedTotal,
+                })
+
+    return distalSegments
 
 class CLAVizModel(VizModel):
     __metaclass__ = ABCMeta
@@ -94,22 +199,12 @@ class CLAVizModel(VizModel):
         if getProximalSynapses:
             assert getBitStates
 
-            proximalSynapses = deque()
-
             onlyBits = None
             if proximalSynapsesQuery['onlyActive']:
                 onlyBits = senses['concatenated']['activeBits']
-            else:
-                onlyBits = sp.getNumInputs()
 
-            permanence = numpy.zeros(sp.getNumInputs()).astype(GetNTAReal())
-            for column in range(sp.getNumColumns()):
-                sp.getPermanence(column, permanence)
-                for inputBit in onlyBits:
-                    if not proximalSynapsesQuery['onlyConnected'] or \
-                       permanence[inputBit] >= spRegion.synPermConnected:
-                        syn = (column, int(inputBit), permanence[inputBit].tolist())
-                        proximalSynapses.append(syn)
+            proximalSynapses = proximalSynapsesFromSP(sp, onlyBits,
+                                                      proximalSynapsesQuery['onlyConnected'])
 
             regions['rgn-0']['layer-3'].update({
                 'proximalSynapses': {
@@ -120,91 +215,17 @@ class CLAVizModel(VizModel):
         if getDistalSegments:
             assert getBitStates
 
-            distalSegments = deque()
-
             columnsToCheck = (regions['rgn-0']['layer-3']['activeColumns'] +
                               distalSegmentsQuery['regions']['rgn-0']['layer-3']['additionalColumns'])
             onlyTargets = distalSegmentsQuery['regions']['rgn-0']['layer-3']['targets']
 
-            for col in columnsToCheck:
-                for cell in range(tp.cellsPerColumn):
-                    if hasattr(tp, "connections"):
-                        # temporal_memory.py
-                        for seg in tp.connections.segmentsForCell(col * tp.cellsPerColumn + cell):
-                            synapses = []
-                            nConnectedActive = 0
-                            nConnectedTotal = 0
-                            nDisconnectedActive = 0
-                            nDisconnectedTotal = 0
-                            for syn in tp.connections.synapsesForSegment(seg):
-                                synapseData = tp.connections.dataForSynapse(syn)
-                                isConnected = synapseData.permanence >= tp.connectedPermanence
-                                isActive = synapseData.presynapticCell in onlyTargets
-
-                                if isConnected:
-                                    nConnectedTotal += 1
-                                else:
-                                    nDisconnectedTotal += 1
-
-                                if isActive:
-                                    if isConnected:
-                                        nConnectedActive += 1
-                                        presynapticCol = synapseData.presynapticCell / tp.cellsPerColumn
-                                        presynapticCellOffset = synapseData.presynapticCell % tp.cellsPerColumn
-                                        syn = (presynapticCol, presynapticCellOffset, synapseData.permanence)
-                                        synapses.append(syn)
-                                    else:
-                                        nDisconnectedActive += 1
-                            distalSegments.append({
-                                "column": col,
-                                "cell": cell,
-                                "synapses": {
-                                    ('regions', 'rgn-0', 'layer-3'): synapses,
-                                },
-                                "nConnectedActive": nConnectedActive,
-                                "nConnectedTotal": nConnectedTotal,
-                                "nDisconnectedActive": nDisconnectedActive,
-                                "nDisconnectedTotal": nDisconnectedTotal,
-                            })
-                    else:
-                        # tm.py
-                        for segIdx in range(tp.getNumSegmentsInCell(col, cell)):
-                            v = tp.getSegmentOnCell(col, cell, segIdx)
-                            segData = v[0]
-                            synapses = []
-                            nConnectedActive = 0
-                            nConnectedTotal = 0
-                            nDisconnectedActive = 0
-                            nDisconnectedTotal = 0
-                            for targetCol, targetCell, perm in v[1:]:
-                                cellId = targetCol * tp.cellsPerColumn + targetCell
-                                isConnected = perm >= tp.connectedPerm
-                                isActive = cellId in onlyTargets
-
-                                if isConnected:
-                                    nConnectedTotal += 1
-                                else:
-                                    nDisconnectedTotal += 1
-
-                                if isActive:
-                                    if isConnected:
-                                        nConnectedActive += 1
-                                        syn = (targetCol, targetCell, perm)
-                                        synapses.append(syn)
-                                    else:
-                                        nDisconnectedActive += 1
-                            distalSegments.append({
-                                "column": col,
-                                "cell": cell,
-                                "synapses": {
-                                    ('regions', 'rgn-0', 'layer-3'): synapses,
-                                },
-                                "nConnectedActive": nConnectedActive,
-                                "nConnectedTotal": nConnectedTotal,
-                                "nDisconnectedActive": nDisconnectedActive,
-                                "nDisconnectedTotal": nDisconnectedTotal,
-                            })
-
+            distalSegments = None
+            if hasattr(tp, "connections"):
+                distalSegments = distalSegmentsFromTM(tp, columnsToCheck, onlyTargets,
+                                                      ('regions', 'rgn-0', 'layer-3'))
+            else:
+                distalSegments = distalSegmentsFromTP(tp, columnsToCheck, onlyTargets
+                                                      ('regions', 'rgn-0', 'layer-3'))
             regions['rgn-0']['layer-3'].update({
                 'distalSegments': distalSegments,
                 "nDistalLearningThreshold": tp.minThreshold,
