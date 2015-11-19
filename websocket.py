@@ -1,13 +1,21 @@
+import numpy
 from autobahn.twisted.websocket import WebSocketServerProtocol
 from transit.writer import Writer
 from transit.reader import Reader
 from transit.transit_types import Keyword
+from transit.write_handlers import IntHandler
 from StringIO import StringIO
 from twisted.internet import reactor
+
+class NumpyIntHandler(IntHandler):
+    @staticmethod
+    def rep(i):
+        return int(i)
 
 def toTransitStr(v):
     io = StringIO()
     writer = Writer(io, "json")
+    writer.register(numpy.uint32, NumpyIntHandler)
     writer.write(v)
     return str(io.getvalue())
 

@@ -249,18 +249,22 @@ class Journal(object):
             for sourcePath, synapses in proximalSynapses.items():
                 synapseTemplate = {}
                 activeBits = []
-                if sourcePath:
-                    synapseTemplate[Keyword('src-id')] = Keyword(sourcePath[1])
-                    if sourcePath[0] == 'senses':
-                        senseData = modelData['senses'][sourcePath[1]]
-                        activeBits = senseData['activeBits']
-                    elif sourcePath[0] == 'regions':
-                        synapseTemplate[Keyword('src-lyr')] = Keyword(sourcePath[2])
-                        sourceLayerData = modelData['regions'][sourcePath[1]][sourcePath[2]]
-                        activeBits = sourceLayerData['activeCells']
+
+                synapseTemplate[Keyword('src-id')] = Keyword(sourcePath[1])
+                if sourcePath[0] == 'senses':
+                    senseData = modelData['senses'][sourcePath[1]]
+                    activeBits = senseData['activeBits']
+                elif sourcePath[0] == 'regions':
+                    synapseTemplate[Keyword('src-lyr')] = Keyword(sourcePath[2])
+                    sourceLayerData = modelData['regions'][sourcePath[1]][sourcePath[2]]
+                    # TODO this is wrong. Need to include only for
+                    # columns. But that's not good enough either
+                    # because we only want columns for which we're
+                    # connected to an active cell.
+                    activeBits = sourceLayerData['activeCells']
 
                 for column, inputBit, perm in synapses:
-                    if column in onlyColumns and inputBit in activeBits:
+                    if column in onlyColumns: # and inputBit in activeBits: # see above
                         if column not in synapsesByColumn:
                             synapsesByColumn[column] = []
 
