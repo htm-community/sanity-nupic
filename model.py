@@ -26,14 +26,19 @@ class VizModel(object):
         del self.listeners[event][eventId]
 
     def doStep(self):
-        self.step()
-        self.timestep += 1
-        for fn in self.listeners['didStep'].values():
-            fn()
+        ret = self.step()
+        if ret is not False:
+            self.timestep += 1
+            for fn in self.listeners['didStep'].values():
+                fn()
+
+        return ret
 
     @abstractmethod
     def step(self):
         """Run one input through the HTM.
+
+        If there are no more inputs, return False.
         """
 
     @abstractmethod

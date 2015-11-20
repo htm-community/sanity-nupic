@@ -13,7 +13,6 @@ sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 import runner
 from model import VizModel, proximalSynapsesFromSP, distalSegmentsFromTM
-from swarmed_model_params import MODEL_PARAMS
 
 class UnionPoolingExperimentVizModel(VizModel):
     def __init__(self, experiment, patterns, labels):

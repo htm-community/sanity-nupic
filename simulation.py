@@ -3,7 +3,9 @@ import threading
 def simulationThread(simulation, checkEvent):
     while True:
         while simulation.isGoing:
-            simulation.vizModel.doStep()
+            ret = simulation.vizModel.doStep()
+            if ret is False:
+                return
         checkEvent.wait()
         checkEvent.clear()
 
