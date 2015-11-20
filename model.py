@@ -43,7 +43,8 @@ class VizModel(object):
 
     @abstractmethod
     def query(self, getNetworkLayout=False, getBitStates=False, getProximalSynapses=False,
-              proximalSynapsesQuery={}, getDistalSegments=False, distalSegmentsQuery={}):
+              proximalSynapsesQuery={}, getDistalSegments=False, distalSegmentsQuery={},
+              getApicalSegments=False, apicalSegmentsQuery={}):
         """
         """
 
@@ -69,21 +70,30 @@ def proximalSynapsesFromSP(sp, targetBits=None, onlyConnectedSynapses=True, targ
     return proximalSynapses
 
 # TODO sourcePath is a hack
-def distalSegmentsFromTM(tm, sourceColumns, targetBits, sourcePath):
-    distalSegments = deque()
+def segmentsFromConnections(connections, tm, sourceColumns,
+                            targetBits, sourcePath, sourceCellsPerColumn,
+                            sourceCellOffset=0):
+
+    segments = deque()
     for col in sourceColumns:
         for cell in range(tm.cellsPerColumn):
-            for seg in tm.connections.segmentsForCell(col * tm.cellsPerColumn + cell):
+            for seg in connections.segmentsForCell(col * tm.cellsPerColumn + cell):
                 synapses = []
                 nConnectedActive = 0
                 nConnectedTotal = 0
                 nDisconnectedActive = 0
                 nDisconnectedTotal = 0
-                for syn in tm.connections.synapsesForSegment(seg):
-                    synapseData = tm.connections.dataForSynapse(syn)
+                for syn in connections.synapsesForSegment(seg):
+                    synapseData = connections.dataForSynapse(syn)
+
+                    # GeneralTemporalMemory describes apical targets
+                    # in terms of its own cell indices, not in terms
+                    # of a remote region.
+                    presynapticCell = synapseData.presynapticCell + sourceCellOffset
+
                     isConnected = synapseData.permanence >= tm.connectedPermanence
                     # TODO not necessarily true
-                    isActive = synapseData.presynapticCell in targetBits
+                    isActive = presynapticCell in targetBits
 
                     if isConnected:
                         nConnectedTotal += 1
@@ -93,13 +103,13 @@ def distalSegmentsFromTM(tm, sourceColumns, targetBits, sourcePath):
                     if isActive:
                         if isConnected:
                             nConnectedActive += 1
-                            presynapticCol = synapseData.presynapticCell / tm.cellsPerColumn
-                            presynapticCellOffset = synapseData.presynapticCell % tm.cellsPerColumn
+                            presynapticCol = presynapticCell / sourceCellsPerColumn
+                            presynapticCellOffset = presynapticCell % sourceCellsPerColumn
                             syn = (presynapticCol, presynapticCellOffset, synapseData.permanence)
                             synapses.append(syn)
                         else:
                             nDisconnectedActive += 1
-                distalSegments.append({
+                segments.append({
                     "column": col,
                     "cell": cell,
                     "synapses": {
@@ -111,7 +121,7 @@ def distalSegmentsFromTM(tm, sourceColumns, targetBits, sourcePath):
                     "nDisconnectedTotal": nDisconnectedTotal,
                 })
 
-    return distalSegments
+    return segments
 
 # TODO sourcePath is a hack
 def distalSegmentsFromTP(tp, sourceColumns, targetBits, sourcePath):
@@ -166,7 +176,8 @@ class CLAVizModel(VizModel):
         self.model = model
 
     def query(self, getNetworkLayout=False, getBitStates=False, getProximalSynapses=False,
-              proximalSynapsesQuery={}, getDistalSegments=False, distalSegmentsQuery={}):
+              proximalSynapsesQuery={}, getDistalSegments=False, distalSegmentsQuery={},
+              getApicalSegments=False, apicalSegmentsQuery={}):
         senses = {'concatenated': {}}
         regions = {'rgn-0': {'layer-3': {}}}
 
@@ -227,8 +238,10 @@ class CLAVizModel(VizModel):
 
             distalSegments = None
             if hasattr(tp, "connections"):
-                distalSegments = distalSegmentsFromTM(tp, columnsToCheck, onlyTargets,
-                                                      ('regions', 'rgn-0', 'layer-3'))
+                distalSegments = segmentsFromConnections(tp.connections, tp, columnsToCheck,
+                                                         onlyTargets,
+                                                         ('regions', 'rgn-0', 'layer-3'),
+                                                         tp.cellsPerColumn)
             else:
                 distalSegments = distalSegmentsFromTP(tp, columnsToCheck, onlyTargets,
                                                       ('regions', 'rgn-0', 'layer-3'))

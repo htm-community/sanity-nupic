@@ -12,7 +12,7 @@ import os, sys
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 import runner
-from model import VizModel, proximalSynapsesFromSP, distalSegmentsFromTM
+from model import VizModel, proximalSynapsesFromSP, segmentsFromConnections
 
 class UnionPoolingExperimentVizModel(VizModel):
     def __init__(self, experiment, patterns, labels):
@@ -45,7 +45,8 @@ class UnionPoolingExperimentVizModel(VizModel):
             return []
 
     def query(self, getNetworkLayout=False, getBitStates=False, getProximalSynapses=False,
-              proximalSynapsesQuery={}, getDistalSegments=False, distalSegmentsQuery={}):
+              proximalSynapsesQuery={}, getDistalSegments=False, distalSegmentsQuery={},
+              getApicalSegments=False, apicalSegmentsQuery={}):
         senses = {
             'input': {}
         }
@@ -131,8 +132,10 @@ class UnionPoolingExperimentVizModel(VizModel):
                               distalSegmentsQuery['regions']['tm']['layer']['additionalColumns'])
             onlyTargets = distalSegmentsQuery['regions']['tm']['layer']['targets']
 
-            distalSegments = distalSegmentsFromTM(tm, columnsToCheck, onlyTargets,
-                                                  sourcePath=('regions', 'tm', 'layer'))
+            distalSegments = segmentsFromConnections(tm.connections, tm, columnsToCheck,
+                                                     onlyTargets,
+                                                     sourcePath=('regions', 'tm', 'layer'),
+                                                     sourceCellsPerColumn = tm.cellsPerColumn)
 
             regions['tm']['layer'].update({
                 'distalSegments': distalSegments,

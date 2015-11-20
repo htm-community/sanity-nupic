@@ -11,7 +11,7 @@ import os, sys
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 import runner
-from model import VizModel, proximalSynapsesFromSP, distalSegmentsFromTM
+from model import VizModel, proximalSynapsesFromSP, segmentsFromConnections
 
 class MonitoredGeneralTemporalMemory(TemporalMemoryMonitorMixin,
                                      GeneralTemporalMemory):
@@ -193,7 +193,8 @@ class FeedbackExperimentVizModel(VizModel):
             return []
 
     def query(self, getNetworkLayout=False, getBitStates=False, getProximalSynapses=False,
-              proximalSynapsesQuery={}, getDistalSegments=False, distalSegmentsQuery={}):
+              proximalSynapsesQuery={}, getDistalSegments=False, distalSegmentsQuery={},
+              getApicalSegments=False, apicalSegmentsQuery={}):
         senses = {
             'input': {}
         }
@@ -282,13 +283,39 @@ class FeedbackExperimentVizModel(VizModel):
                               distalSegmentsQuery['regions']['tm']['layer']['additionalColumns'])
             onlyTargets = distalSegmentsQuery['regions']['tm']['layer']['targets']
 
-            distalSegments = distalSegmentsFromTM(tm, columnsToCheck, onlyTargets,
-                                                  sourcePath=('regions', 'tm', 'layer'))
+            distalSegments = segmentsFromConnections(tm.connections, tm, columnsToCheck,
+                                                     onlyTargets,
+                                                     sourceCellsPerColumn= tm.cellsPerColumn,
+                                                     sourcePath=('regions', 'tm', 'layer'))
 
             regions['tm']['layer'].update({
                 'distalSegments': distalSegments,
                 "nDistalLearningThreshold": tm.minThreshold,
                 "nDistalStimulusThreshold": tm.activationThreshold,
+            })
+
+        if getApicalSegments:
+            assert getBitStates
+
+            columnsToCheck = (regions['tm']['layer']['activeColumns'] |
+                              apicalSegmentsQuery['regions']['tm']['layer']['additionalColumns'])
+            onlyTargets = apicalSegmentsQuery['regions']['pseudo']['layer']['targets']
+
+            onlyTargetsOffset = set(target + tm.numberOfCells()
+                                    for target in onlyTargets)
+
+            apicalSegments = segmentsFromConnections(tm.apicalConnections, tm, columnsToCheck,
+                                                     onlyTargets,
+                                                     sourcePath=('regions', 'pseudo', 'layer'),
+                                                     sourceCellsPerColumn= 1,
+                                                     sourceCellOffset= -tm.numberOfCells())
+
+            syns = [seg['synapses'] for seg in apicalSegments]
+
+            regions['tm']['layer'].update({
+                'apicalSegments': apicalSegments,
+                "nApicalLearningThreshold": tm.minThreshold,
+                "nApicalStimulusThreshold": tm.activationThreshold,
             })
 
         return {

@@ -24,6 +24,12 @@ class Journal(object):
                 Keyword("only-active?"): True,
                 Keyword("only-noteworthy-columns?"): True,
             },
+            Keyword("apical-synapses"): {
+                Keyword("capture?"): False,
+                Keyword("min-perm"): 0.5, # TODO
+                Keyword("only-active?"): True,
+                Keyword("only-noteworthy-columns?"): True,
+            },
         }
 
         self.absorbStepTemplate(vizModel)
@@ -96,6 +102,32 @@ class Journal(object):
                 'distalSegmentsQuery': distalSegmentsQuery,
             })
 
+        if (len(self.journal) > 0 and
+            self.captureOptions[Keyword("apical-synapses")][Keyword("capture?")]):
+
+            apicalSegmentsQuery = {
+                'senses': {},
+                'regions': {},
+            }
+
+            for senseName, prevSenseData in self.journal[-1]['senses'].items():
+                apicalSegmentsQuery['senses'][senseName] = {
+                    'targets': prevSenseData['activeBits'],
+                }
+
+            for regionName, prevRegionData in self.journal[-1]['regions'].items():
+                apicalSegmentsQuery['regions'][regionName] = {}
+                for layerName, prevLayerData in prevRegionData.items():
+                    apicalSegmentsQuery['regions'][regionName][layerName] = {
+                        'targets': prevLayerData['activeCells'],
+                        'additionalColumns': prevLayerData['predictedColumns'],
+                    }
+
+            queryArgs.update({
+                'getApicalSegments': True,
+                'apicalSegmentsQuery': apicalSegmentsQuery,
+            })
+
         # TODO: grab the specified synapse types
 
         self.journal.append(vizModel.query(**queryArgs))
@@ -129,113 +161,31 @@ class Journal(object):
             modelData = self.journal[modelId]
             layerData = modelData['regions'][str(rgnId)][str(lyrId)]
             layerTemplate = self.stepTemplate['regions'][str(rgnId)][str(lyrId)]
-            cellsPerColumn = layerTemplate['cellsPerColumn']
 
-            firstCellInCol = col * cellsPerColumn
-            activeCellsInCol = [cellId - firstCellInCol
-                                for cellId in layerData["activeCells"]
-                                if (cellId >= firstCellInCol and
-                                    cellId < firstCellInCol + cellsPerColumn)]
-            predictedCellsInCol = []
-            if modelId > 0:
-                prevModelData = self.journal[modelId - 1]
-                prevLayerData = prevModelData['regions'][str(rgnId)][str(lyrId)]
-                predictedCellsInCol = [cellId - firstCellInCol
-                                       for cellId in prevLayerData['predictedCells']
-                                       if (cellId >= firstCellInCol and
-                                           cellId < firstCellInCol + cellsPerColumn)]
+            distalSegments = filter(lambda seg: (seg["column"] == col),
+                                          layerData.get("distalSegments", []))
+            apicalSegments = filter(lambda seg: (seg["column"] == col),
+                                          layerData.get("apicalSegments", []))
 
-            distalSegments = layerData.get("distalSegments", [])
-            colSegs = filter(lambda seg: (seg["column"] == col), distalSegments)
-
-            connectedActiveMax = -1
-            cellWithMax = None
-            segIdxWithMax = None
-            ret = {}
-            for i in range(cellsPerColumn):
-                isActive = i in activeCellsInCol
-                isPredicted = i in predictedCellsInCol
-
-                cellState = None
-                if isActive and isPredicted:
-                    cellState = "active-predicted"
-                elif isActive:
-                    cellState = "active"
-                elif isPredicted:
-                    cellState = "predicted"
-                else:
-                    cellState = "inactive"
-
-                cellData = {
-                    Keyword("cell-active?"): isActive,
-                    Keyword("cell-predictive?"): isPredicted,
-                    Keyword("cell-state"): Keyword(cellState),
-                }
-
-                segs = {}
-                segIdx = -1 # HACK, it's gross that viz requires an index
-                for segment in filter(lambda seg: seg["cell"] == i, colSegs):
-                    segIdx += 1
-
-                    # TODO only send synapses according to viz-options
-                    # e.g. only for selected segment
-                    activeSynapses = []
-                    for sourcePath, synapses in segment["synapses"].items():
-                        synapseTemplate = {}
-                        if sourcePath:
-                            synapseTemplate[Keyword('src-id')] = Keyword(sourcePath[1])
-                            if sourcePath[0] == 'regions':
-                                synapseTemplate[Keyword('src-lyr')] = Keyword(sourcePath[2])
-
-                        for targetCol, targetCell, perm in synapses:
-                            syn = synapseTemplate.copy()
-                            syn.update({
-                                Keyword("src-col"): targetCol,
-                                Keyword("perm"): perm,
-                            })
-                            activeSynapses.append(syn)
-
-                    nConnectedActive = segment["nConnectedActive"]
-                    if nConnectedActive > connectedActiveMax:
-                        connectedActiveMax = nConnectedActive
-                        cellWithMax = i
-                        segIdxWithMax = segIdx
-
-                    segData = {
-                        Keyword("n-conn-act"): nConnectedActive,
-                        Keyword("n-conn-tot"): segment["nConnectedTotal"],
-                        Keyword("n-disc-act"): segment["nDisconnectedActive"],
-                        Keyword("n-disc-tot"): segment["nDisconnectedTotal"],
-                        Keyword("stimulus-th"): layerData["nDistalStimulusThreshold"],
-                        Keyword("learning-th"): layerData["nDistalLearningThreshold"],
-                        Keyword("syns-by-state"): {
-                            Keyword("active"): activeSynapses,
-                        },
-                    }
-                    segs[segIdx] = segData
-
-                cellData[Keyword("segments")] = segs
-
-                ret[i] = cellData
-
-            selCell = None
-            selSegIdx = None
-            if ci_si is not None:
-                selCell, selSegIdx = ci_si
-            elif cellWithMax is not None and segIdxWithMax is not None:
-                selCell = cellWithMax
-                selSegIdx = segIdxWithMax
-
-            if selCell is not None and selSegIdx is not None:
-                ret[selCell][Keyword("selected-cell?")] = True
-                # Because a client can select a segment and step backward and
-                # forward in time, it may be requesting a segment that doesn't
-                # exist in this timestep, or one that we've optimized away.
-                if selSegIdx in ret[selCell][Keyword("segments")]:
-                    ret[selCell][Keyword("segments")][selSegIdx][Keyword("selected-seg?")] = True
+            # TODO this is gross. We should rework the
+            # get-cells-segments message. It has redundant information
+            # between distal and apical segments, both messages
+            # containing cell information, and with hard-to-understand
+            # selection behavior.
+            distal = self.getCellsSegmentsResponse(modelId, rgnId, lyrId, col, ci_si, layerData,
+                                                   layerData.get("distalSegments", []),
+                                                   layerTemplate['cellsPerColumn'],
+                                                   "nDistalStimulusThreshold",
+                                                   "nDistalLearningThreshold")
+            apical = self.getCellsSegmentsResponse(modelId, rgnId, lyrId, col, ci_si, layerData,
+                                                   layerData.get("apicalSegments", []),
+                                                   layerTemplate['cellsPerColumn'],
+                                                   "nApicalStimulusThreshold",
+                                                   "nApicalLearningThreshold")
 
             responseChannel.put({
-                Keyword("distal"): ret,
+                Keyword('distal'): distal,
+                Keyword('apical'): apical,
             })
 
         elif command == "get-ff-in-synapses":
@@ -319,3 +269,112 @@ class Journal(object):
             responseChannel.put("this is your token")
         # else:
         #     print "Unrecognized command! %s" % command
+
+    def getCellsSegmentsResponse(self, modelId, rgnId,
+                                 lyrId, col, ci_si, layerData, segments,
+                                 cellsPerColumn, nStimulusThresholdKey,
+                                 nLearningThresholdKey):
+        # TODO yes whole method is gross.
+        firstCellInCol = col * cellsPerColumn
+        activeCellsInCol = [cellId - firstCellInCol
+                            for cellId in layerData["activeCells"]
+                            if (cellId >= firstCellInCol and
+                                cellId < firstCellInCol + cellsPerColumn)]
+        predictedCellsInCol = []
+        if modelId > 0:
+            prevModelData = self.journal[modelId - 1]
+            prevLayerData = prevModelData['regions'][str(rgnId)][str(lyrId)]
+            predictedCellsInCol = [cellId - firstCellInCol
+                                   for cellId in prevLayerData['predictedCells']
+                                   if (cellId >= firstCellInCol and
+                                       cellId < firstCellInCol + cellsPerColumn)]
+
+        columnSegments = filter(lambda seg: (seg["column"] == col), segments)
+
+        connectedActiveMax = -1
+        cellWithMax = None
+        segIdxWithMax = None
+        ret = {}
+        for i in range(cellsPerColumn):
+            isActive = i in activeCellsInCol
+            isPredicted = i in predictedCellsInCol
+
+            cellState = None
+            if isActive and isPredicted:
+                cellState = "active-predicted"
+            elif isActive:
+                cellState = "active"
+            elif isPredicted:
+                cellState = "predicted"
+            else:
+                cellState = "inactive"
+
+            cellData = {
+                Keyword("cell-active?"): isActive,
+                Keyword("cell-predictive?"): isPredicted,
+                Keyword("cell-state"): Keyword(cellState),
+            }
+
+            segs = {}
+            segIdx = -1 # HACK, it's gross that viz requires an index
+            for segment in filter(lambda seg: seg["cell"] == i, columnSegments):
+                segIdx += 1
+
+                # TODO only send synapses according to viz-options
+                # e.g. only for selected segment
+                activeSynapses = []
+                for sourcePath, synapses in segment["synapses"].items():
+                    synapseTemplate = {}
+                    if sourcePath:
+                        synapseTemplate[Keyword('src-id')] = Keyword(sourcePath[1])
+                        if sourcePath[0] == 'regions':
+                            synapseTemplate[Keyword('src-lyr')] = Keyword(sourcePath[2])
+
+                    for targetCol, targetCell, perm in synapses:
+                        syn = synapseTemplate.copy()
+                        syn.update({
+                            Keyword("src-col"): targetCol,
+                            Keyword("perm"): perm,
+                        })
+                        activeSynapses.append(syn)
+
+                nConnectedActive = segment["nConnectedActive"]
+                if nConnectedActive > connectedActiveMax:
+                    connectedActiveMax = nConnectedActive
+                    cellWithMax = i
+                    segIdxWithMax = segIdx
+
+                segData = {
+                    Keyword("n-conn-act"): nConnectedActive,
+                    Keyword("n-conn-tot"): segment["nConnectedTotal"],
+                    Keyword("n-disc-act"): segment["nDisconnectedActive"],
+                    Keyword("n-disc-tot"): segment["nDisconnectedTotal"],
+                    Keyword("stimulus-th"): layerData[nStimulusThresholdKey],
+                    Keyword("learning-th"): layerData[nLearningThresholdKey],
+                    Keyword("syns-by-state"): {
+                        Keyword("active"): activeSynapses,
+                    },
+                }
+                segs[segIdx] = segData
+
+            cellData[Keyword("segments")] = segs
+
+            ret[i] = cellData
+
+        selCell = None
+        selSegIdx = None
+        if ci_si is not None:
+            selCell, selSegIdx = ci_si
+        elif cellWithMax is not None and segIdxWithMax is not None:
+            selCell = cellWithMax
+            selSegIdx = segIdxWithMax
+
+        if selCell is not None and selSegIdx is not None:
+            ret[selCell][Keyword("selected-cell?")] = True
+            # Because a client can select a segment and step backward and
+            # forward in time, it may be requesting a segment that doesn't
+            # exist in this timestep, or one that we've optimized away.
+            if selSegIdx in ret[selCell][Keyword("segments")]:
+                ret[selCell][Keyword("segments")][selSegIdx][Keyword("selected-seg?")] = True
+
+        return ret
