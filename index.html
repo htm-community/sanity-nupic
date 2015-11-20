@@ -29,9 +29,9 @@
 
   <script type="text/javascript" src="comportexviz/public/demos/out/goog/base.js"></script>
   <script type="text/javascript" src="comportexviz/public/demos/out/comportexviz.js"></script>
-  <script type="text/javascript">goog.require("comportexviz.demos.nupic_runner");</script>
+  <script type="text/javascript">goog.require("comportexviz.demos.runner");</script>
   <script type="text/javascript">
-    comportexviz.demos.nupic_runner.init();
+    comportexviz.demos.runner.init("NuPIC", "ws://localhost:24601", "capture", "drawing");
   </script>
 </body>
 </html>

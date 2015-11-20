@@ -239,7 +239,7 @@ class Journal(object):
             })
 
         elif command == "get-ff-in-synapses":
-            modelId, rgnId, lyrId, onlyColumns, token, responseChannel = args
+            modelId, rgnId, lyrId, onlyColumns, doTraceBack, token, responseChannel = args
             modelData = self.journal[modelId]
             layerData = modelData["regions"][str(rgnId)][str(lyrId)]
             proximalSynapses = layerData.get('proximalSynapses', {})

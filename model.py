@@ -186,14 +186,15 @@ class CLAVizModel(VizModel):
 
         if getBitStates:
             senses['concatenated'].update({
-                'activeBits': spRegion._spatialPoolerInput.nonzero()[0].tolist()
+                'activeBits': set(spRegion._spatialPoolerInput.nonzero()[0].tolist()),
             })
             npPredictedCells = tp.getPredictedState().reshape(-1).nonzero()[0]
             regions['rgn-0']['layer-3'].update({
-                "activeColumns": spOutput.nonzero()[0].tolist(),
-                "activeCells": tp.getActiveState().nonzero()[0].tolist(),
-                "predictedCells": npPredictedCells.tolist(),
-                "predictedColumns": numpy.unique(npPredictedCells / tp.cellsPerColumn).tolist(),
+                "activeColumns": set(spOutput.nonzero()[0].tolist()),
+                "activeCells": set(tp.getActiveState().nonzero()[0].tolist()),
+                "predictedCells": set(npPredictedCells.tolist()),
+                "predictedColumns": set(numpy.unique(npPredictedCells /
+                                                     tp.cellsPerColumn).tolist()),
             })
 
         if getProximalSynapses:
