@@ -216,7 +216,7 @@ class CLAVizModel(VizModel):
         if getDistalSegments:
             assert getBitStates
 
-            columnsToCheck = (regions['rgn-0']['layer-3']['activeColumns'] +
+            columnsToCheck = (regions['rgn-0']['layer-3']['activeColumns'] |
                               distalSegmentsQuery['regions']['rgn-0']['layer-3']['additionalColumns'])
             onlyTargets = distalSegmentsQuery['regions']['rgn-0']['layer-3']['targets']
 
@@ -225,7 +225,7 @@ class CLAVizModel(VizModel):
                 distalSegments = distalSegmentsFromTM(tp, columnsToCheck, onlyTargets,
                                                       ('regions', 'rgn-0', 'layer-3'))
             else:
-                distalSegments = distalSegmentsFromTP(tp, columnsToCheck, onlyTargets
+                distalSegments = distalSegmentsFromTP(tp, columnsToCheck, onlyTargets,
                                                       ('regions', 'rgn-0', 'layer-3'))
             regions['rgn-0']['layer-3'].update({
                 'distalSegments': distalSegments,

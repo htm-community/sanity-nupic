@@ -76,27 +76,27 @@ class UnionPoolingExperimentVizModel(VizModel):
             if self.lastInputIndex >= 0:
                 pattern = self.patterns[self.lastInputIndex]
                 if pattern:
-                    activeBits = pattern
+                    activeBits = set(pattern)
 
             senses['input'].update({
                 'activeBits': activeBits,
             })
 
-            predictiveCells = tm.predictiveCells
+            predictiveCells = set(tm.predictiveCells)
             predictiveColumns = set(cell / tm.cellsPerColumn for cell in predictiveCells)
             regions['tm']['layer'].update({
                 'activeColumns': activeBits,
-                'activeCells': tm.activeCells,
-                'predictedCells': predictiveCells,
+                'activeCells': set(tm.activeCells),
+                'predictedCells': set(predictiveCells),
                 'predictedColumns': predictiveColumns,
             })
 
-            activeColumns = up.getUnionSDR().tolist()
+            activeColumns = set(up.getUnionSDR().tolist())
             regions['up']['layer'].update({
                 'activeColumns': activeColumns,
                 'activeCells': activeColumns,
-                'predictedCells': [],
-                'predictedColumns': [],
+                'predictedCells': set(),
+                'predictedColumns': set(),
             })
 
         if getProximalSynapses:
