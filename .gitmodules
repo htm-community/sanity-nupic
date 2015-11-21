@@ -1,4 +1,4 @@
 [submodule "comportexviz"]
 	path = comportexviz
-	url = https://github.com/mrcslws/comportexviz.git
-	branch = comportexviz-nupic
+	url = https://github.com/nupic-community/comportexviz.git
+	branch = master
