@@ -270,18 +270,6 @@ class FeedbackExperimentVizModel(VizModel):
                 'predictedColumns': set(),
             })
 
-        if getProximalSynapses:
-            assert getBitStates
-
-            # Pseudo-synapses
-            tmSynapses = deque((column, column, 1)
-                               for column in range(tm.numberOfColumns()))
-            regions['tm']['layer'].update({
-                'proximalSynapses': {
-                    ('senses', 'input'): tmSynapses,
-                },
-            })
-
         if getDistalSegments or getApicalSegments:
             assert getBitStates
             try:

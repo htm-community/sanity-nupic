@@ -107,24 +107,11 @@ class UnionPoolingExperimentVizModel(VizModel):
 
         if getProximalSynapses:
             assert getBitStates
-
-            # Pseudo-synapses
-            tmSynapses = deque((column, column, 1)
-                               for column in range(tm.numberOfColumns()))
-            regions['tm']['layer'].update({
-                'proximalSynapses': {
-                    ('senses', 'input'): tmSynapses,
-                },
-            })
-
-            onlyTmBits = None
-            if proximalSynapsesQuery['onlyActive']:
-                onlyTmBits = regions['tm']['layer']['activeCells']
-
-            upSynapses = proximalSynapsesFromSP(up, onlyTmBits,
+            upSynapses = proximalSynapsesFromSP(up,
+                                                regions['tm']['layer']['activeCells'],
+                                                proximalSynapsesQuery['onlyActive'],
                                                 proximalSynapsesQuery['onlyConnected'],
                                                 targetDepth=tm.cellsPerColumn)
-
             regions['up']['layer'].update({
                 'proximalSynapses': {
                     ('regions', 'tm', 'layer'): upSynapses,

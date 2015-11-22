@@ -54,21 +54,29 @@ class VizModel(object):
         """Return the most recent input as a dictionary or a list of key-value pairs.
         """
 
-def proximalSynapsesFromSP(sp, targetBits=None, onlyConnectedSynapses=True, targetDepth=1):
-    if not targetBits:
-        targetBits = range(sp.getNumInputs())
-
-    proximalSynapses = deque()
+def proximalSynapsesFromSP(sp, activeBits, onlyActiveSynapses,
+                           onlyConnectedSynapses, targetDepth=1):
+    activeSyns = deque()
+    inactiveSyns = deque()
+    disconnectedSyns = deque()
     permanence = numpy.zeros(sp.getNumInputs()).astype(GetNTAReal())
+    synPermConnected = sp.getSynPermConnected()
     for column in range(sp.getNumColumns()):
         sp.getPermanence(column, permanence)
-        for inputBit in targetBits:
-            if not onlyConnectedSynapses or permanence[inputBit] >= sp.getSynPermConnected():
+        # TODO don't just scan activeBits
+        for inputBit in activeBits:
+            isActive = True
+            isConnected = permanence[inputBit] >= synPermConnected
+            if isConnected:
                 targetColumn = int(inputBit / targetDepth)
                 syn = (column, targetColumn, permanence[inputBit])
-                proximalSynapses.append(syn)
+                activeSyns.append(syn)
 
-    return proximalSynapses
+    return {
+        'active': activeSyns,
+        'inactive-syn': inactiveSyns,
+        'disconnected': disconnectedSyns,
+    }
 
 # TODO sourcePath is a hack
 def segmentsFromConnections(connections, tm, sourceColumns,
@@ -214,12 +222,9 @@ class CLAVizModel(VizModel):
 
         if getProximalSynapses:
             assert getBitStates
-
-            onlyBits = None
-            if proximalSynapsesQuery['onlyActive']:
-                onlyBits = senses['concatenated']['activeBits']
-
-            proximalSynapses = proximalSynapsesFromSP(sp, onlyBits,
+            proximalSynapses = proximalSynapsesFromSP(sp,
+                                                      senses['concatenated']['activeBits'],
+                                                      proximalSynapsesQuery['onlyActive'],
                                                       proximalSynapsesQuery['onlyConnected'])
 
             regions['rgn-0']['layer-3'].update({

@@ -93,14 +93,11 @@ class Journal(object):
         }
 
         if self.captureOptions[Keyword("ff-synapses")][Keyword("capture?")]:
-            proximalSynapsesQuery = {
-                'onlyActive': True,
-                'onlyConnected': True,
-            }
+            onlyActive = self.captureOptions[Keyword('ff-synapses')][Keyword('only-active?')]
             queryArgs.update({
                 'getProximalSynapses': True,
                 'proximalSynapsesQuery': {
-                    'onlyActive': True,
+                    'onlyActive': onlyActive,
                     'onlyConnected': True,
                 },
             })
@@ -180,38 +177,31 @@ class Journal(object):
             modelData = self.journal[modelId]
             layerData = modelData["regions"][str(rgnId)][str(lyrId)]
             proximalSynapses = layerData.get('proximalSynapses', {})
-
             synapsesByColumn = {}
+            for sourcePath, synapsesByState in proximalSynapses.items():
+                for state, synapses in synapsesByState.items():
+                    synapseTemplate = {
+                        Keyword('src-id'): Keyword(sourcePath[1]),
+                        Keyword('syn-state'): Keyword(state),
+                    }
+                    activeBits = []
+                    if sourcePath[0] == 'senses':
+                        senseData = modelData['senses'][sourcePath[1]]
+                        activeBits = senseData['activeBits']
+                    elif sourcePath[0] == 'regions':
+                        synapseTemplate[Keyword('src-lyr')] = Keyword(sourcePath[2])
 
-            for sourcePath, synapses in proximalSynapses.items():
-                synapseTemplate = {}
-                activeBits = []
+                    for column, sourceColumn, perm in synapses:
+                        if column in onlyColumns:
+                            if column not in synapsesByColumn:
+                                synapsesByColumn[column] = []
 
-                synapseTemplate[Keyword('src-id')] = Keyword(sourcePath[1])
-                if sourcePath[0] == 'senses':
-                    senseData = modelData['senses'][sourcePath[1]]
-                    activeBits = senseData['activeBits']
-                elif sourcePath[0] == 'regions':
-                    synapseTemplate[Keyword('src-lyr')] = Keyword(sourcePath[2])
-                    sourceLayerData = modelData['regions'][sourcePath[1]][sourcePath[2]]
-                    # TODO this is wrong. Need to include only for
-                    # columns. But that's not good enough either
-                    # because we only want columns for which we're
-                    # connected to an active cell.
-                    activeBits = sourceLayerData['activeCells']
-
-                for column, inputBit, perm in synapses:
-                    if column in onlyColumns: # and inputBit in activeBits: # see above
-                        if column not in synapsesByColumn:
-                            synapsesByColumn[column] = []
-
-                        syn = synapseTemplate.copy()
-                        syn.update({
-                            Keyword("src-col"): inputBit,
-                            Keyword("syn-state"): Keyword("active"),
-                            Keyword("perm"): perm,
-                        })
-                        synapsesByColumn[column].append(syn)
+                            syn = synapseTemplate.copy()
+                            syn.update({
+                                Keyword("src-col"): sourceColumn,
+                                Keyword("perm"): perm,
+                            })
+                            synapsesByColumn[column].append(syn)
 
             ret = {}
             for column, synapses in synapsesByColumn.items():
