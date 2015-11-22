@@ -59,16 +59,21 @@ class UnionPoolingExperimentVizModel(VizModel):
         up = self.experiment.up
 
         if getNetworkLayout:
-            senses['input']['dimensions'] = tm.columnDimensions
+            senses['input'].update({
+                'dimensions': tm.columnDimensions,
+                'ordinal': 0,
+            })
 
             regions['tm']['layer'].update({
                 'cellsPerColumn': tm.cellsPerColumn,
                 'dimensions': tm.columnDimensions,
+                'ordinal': 1,
             })
 
             regions['up']['layer'].update({
                 'cellsPerColumn': 1,
-                'dimensions': up.getColumnDimensions().tolist()
+                'dimensions': up.getColumnDimensions().tolist(),
+                'ordinal': 2,
             })
 
         if getBitStates:

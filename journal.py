@@ -42,6 +42,7 @@ class Journal(object):
         for name, senseData in self.stepTemplate["senses"].items():
             senses[Keyword(name)] = {
                 Keyword("dimensions"): senseData["dimensions"],
+                Keyword('ordinal'): senseData['ordinal'],
             }
 
         regions = {}
@@ -50,6 +51,7 @@ class Journal(object):
             for layerName, layerData in regionData.items():
                 region[Keyword(layerName)] = {
                     Keyword("dimensions"): layerData["dimensions"],
+                    Keyword('ordinal'): layerData['ordinal'],
                 }
             regions[Keyword(regionName)] = region
 

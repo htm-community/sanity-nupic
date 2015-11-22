@@ -194,10 +194,14 @@ class CLAVizModel(VizModel):
                 inputDimensions = inputDimensions.tolist()
             if hasattr(columnDimensions, 'tolist'):
                 columnDimensions = columnDimensions.tolist()
-            senses['concatenated']['dimensions'] = inputDimensions
+            senses['concatenated'].update({
+                'dimensions': inputDimensions,
+                'ordinal': 0,
+            })
             regions['rgn-0']['layer-3'].update({
                 'dimensions': columnDimensions,
-                'cellsPerColumn': tp.cellsPerColumn
+                'cellsPerColumn': tp.cellsPerColumn,
+                'ordinal': 1,
             })
 
         if getBitStates:

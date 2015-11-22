@@ -302,6 +302,14 @@ class FeedbackExperimentVizModel(VizModel):
         if getApicalSegments:
             assert getBitStates
 
+            # TODO there's a terrible horrible bug. Using the active
+            # feedback bits from the previous timestep. Normally
+            # that'd be correct, but the TemporalMemory is passed the
+            # bits directly, so it just reads feedback bits the same
+            # way it reads feedforward bits: for the current
+            # timestep. So we're drawing meaningless synapses, and not
+            # drawing the meaningful ones. Yes, I knew about this.
+
             columnsToCheck = (regions['tm']['layer']['activeColumns'] |
                               apicalSegmentsQuery['regions']['tm']['layer']['additionalColumns'])
             onlyTargets = apicalSegmentsQuery['regions']['pseudo']['layer']['targets']
