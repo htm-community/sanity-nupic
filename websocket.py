@@ -3,7 +3,7 @@ from autobahn.twisted.websocket import WebSocketServerProtocol
 from transit.writer import Writer
 from transit.reader import Reader
 from transit.transit_types import Keyword
-from transit.write_handlers import IntHandler, FloatHandler
+from transit.write_handlers import IntHandler, FloatHandler, ArrayHandler
 from StringIO import StringIO
 from twisted.internet import reactor
 
@@ -17,11 +17,17 @@ class NumpyFloatHandler(FloatHandler):
     def rep(f):
         return float(f)
 
+class NumpyArrayHandler(ArrayHandler):
+    @staticmethod
+    def rep(a):
+        return a.tolist()
+
 def toTransitStr(v):
     io = StringIO()
     writer = Writer(io, "json")
     writer.register(numpy.uint32, NumpyIntHandler)
     writer.register(numpy.float32, NumpyFloatHandler)
+    writer.register(numpy.ndarray, NumpyArrayHandler)
     writer.write(v)
     return str(io.getvalue())
 

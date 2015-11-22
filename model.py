@@ -42,8 +42,9 @@ class VizModel(object):
         """
 
     @abstractmethod
-    def query(self, getNetworkLayout=False, getBitStates=False, getProximalSynapses=False,
-              proximalSynapsesQuery={}, getDistalSegments=False, distalSegmentsQuery={},
+    def query(self, bitHistory, getNetworkLayout=False, getBitStates=False,
+              getProximalSynapses=False, proximalSynapsesQuery={},
+              getDistalSegments=False, distalSegmentsQuery={},
               getApicalSegments=False, apicalSegmentsQuery={}):
         """
         """
@@ -175,8 +176,9 @@ class CLAVizModel(VizModel):
         super(CLAVizModel, self).__init__()
         self.model = model
 
-    def query(self, getNetworkLayout=False, getBitStates=False, getProximalSynapses=False,
-              proximalSynapsesQuery={}, getDistalSegments=False, distalSegmentsQuery={},
+    def query(self, bitHistory, getNetworkLayout=False, getBitStates=False,
+              getProximalSynapses=False, proximalSynapsesQuery={},
+              getDistalSegments=False, distalSegmentsQuery={},
               getApicalSegments=False, apicalSegmentsQuery={}):
         senses = {'concatenated': {}}
         regions = {'rgn-0': {'layer-3': {}}}
@@ -187,19 +189,12 @@ class CLAVizModel(VizModel):
         tp = self.model._getTPRegion().getSelf()._tfdr
 
         if getNetworkLayout:
-            inputDimensions = sp.getInputDimensions()
-            columnDimensions = sp.getColumnDimensions()
-            # The python spatial pooler returns a numpy array.
-            if hasattr(inputDimensions, 'tolist'):
-                inputDimensions = inputDimensions.tolist()
-            if hasattr(columnDimensions, 'tolist'):
-                columnDimensions = columnDimensions.tolist()
             senses['concatenated'].update({
-                'dimensions': inputDimensions,
+                'dimensions': sp.getInputDimensions(),
                 'ordinal': 0,
             })
             regions['rgn-0']['layer-3'].update({
-                'dimensions': columnDimensions,
+                'dimensions': sp.getColumnDimensions(),
                 'cellsPerColumn': tp.cellsPerColumn,
                 'ordinal': 1,
             })
@@ -235,25 +230,32 @@ class CLAVizModel(VizModel):
 
         if getDistalSegments:
             assert getBitStates
-
-            columnsToCheck = (regions['rgn-0']['layer-3']['activeColumns'] |
-                              distalSegmentsQuery['regions']['rgn-0']['layer-3']['additionalColumns'])
-            onlyTargets = distalSegmentsQuery['regions']['rgn-0']['layer-3']['targets']
-
-            distalSegments = None
-            if hasattr(tp, "connections"):
-                distalSegments = segmentsFromConnections(tp.connections, tp, columnsToCheck,
-                                                         onlyTargets,
-                                                         ('regions', 'rgn-0', 'layer-3'),
-                                                         tp.cellsPerColumn)
-            else:
-                distalSegments = distalSegmentsFromTP(tp, columnsToCheck, onlyTargets,
-                                                      ('regions', 'rgn-0', 'layer-3'))
-            regions['rgn-0']['layer-3'].update({
-                'distalSegments': distalSegments,
-                "nDistalLearningThreshold": tp.minThreshold,
-                "nDistalStimulusThreshold": tp.activationThreshold,
-            })
+            try:
+                prevState = bitHistory.next()
+                columnsToCheck = (regions['rgn-0']['layer-3']['activeColumns'] |
+                                  prevState['regions']['rgn-0']['layer-3']['predictedColumns'])
+                onlySources = prevState['regions']['rgn-0']['layer-3']['activeCells']
+                if hasattr(tp, "connections"):
+                    distalSegments = segmentsFromConnections(tp.connections, tp,
+                                                             columnsToCheck,
+                                                             onlySources,
+                                                             ('regions',
+                                                              'rgn-0',
+                                                              'layer-3'),
+                                                             tp.cellsPerColumn)
+                else:
+                    distalSegments = distalSegmentsFromTP(tp, columnsToCheck,
+                                                          onlySources,
+                                                          ('regions', 'rgn-0',
+                                                           'layer-3'))
+                regions['rgn-0']['layer-3'].update({
+                    'distalSegments': distalSegments,
+                    "nDistalLearningThreshold": tp.minThreshold,
+                    "nDistalStimulusThreshold": tp.activationThreshold,
+                })
+            except StopIteration:
+                # No previous timestep available.
+                pass
 
         return {
             'senses': senses,

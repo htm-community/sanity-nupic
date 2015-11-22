@@ -192,8 +192,9 @@ class FeedbackExperimentVizModel(VizModel):
         else:
             return []
 
-    def query(self, getNetworkLayout=False, getBitStates=False, getProximalSynapses=False,
-              proximalSynapsesQuery={}, getDistalSegments=False, distalSegmentsQuery={},
+    def query(self, bitHistory, getNetworkLayout=False, getBitStates=False,
+              getProximalSynapses=False, proximalSynapsesQuery={},
+              getDistalSegments=False, distalSegmentsQuery={},
               getApicalSegments=False, apicalSegmentsQuery={}):
         senses = {
             'input': {}
@@ -281,55 +282,43 @@ class FeedbackExperimentVizModel(VizModel):
                 },
             })
 
-        if getDistalSegments:
+        if getDistalSegments or getApicalSegments:
             assert getBitStates
+            try:
+                prevState = bitHistory.next()
+                columnsToCheck = (regions['tm']['layer']['activeColumns'] |
+                                  prevState['regions']['tm']['layer']['predictedColumns'])
 
-            columnsToCheck = (regions['tm']['layer']['activeColumns'] |
-                              distalSegmentsQuery['regions']['tm']['layer']['additionalColumns'])
-            onlyTargets = distalSegmentsQuery['regions']['tm']['layer']['targets']
-
-            distalSegments = segmentsFromConnections(tm.connections, tm, columnsToCheck,
-                                                     onlyTargets,
-                                                     sourceCellsPerColumn= tm.cellsPerColumn,
-                                                     sourcePath=('regions', 'tm', 'layer'))
-
-            regions['tm']['layer'].update({
-                'distalSegments': distalSegments,
-                "nDistalLearningThreshold": tm.minThreshold,
-                "nDistalStimulusThreshold": tm.activationThreshold,
-            })
-
-        if getApicalSegments:
-            assert getBitStates
-
-            # TODO there's a terrible horrible bug. Using the active
-            # feedback bits from the previous timestep. Normally
-            # that'd be correct, but the TemporalMemory is passed the
-            # bits directly, so it just reads feedback bits the same
-            # way it reads feedforward bits: for the current
-            # timestep. So we're drawing meaningless synapses, and not
-            # drawing the meaningful ones. Yes, I knew about this.
-
-            columnsToCheck = (regions['tm']['layer']['activeColumns'] |
-                              apicalSegmentsQuery['regions']['tm']['layer']['additionalColumns'])
-            onlyTargets = apicalSegmentsQuery['regions']['pseudo']['layer']['targets']
-
-            onlyTargetsOffset = set(target + tm.numberOfCells()
-                                    for target in onlyTargets)
-
-            apicalSegments = segmentsFromConnections(tm.apicalConnections, tm, columnsToCheck,
-                                                     onlyTargets,
-                                                     sourcePath=('regions', 'pseudo', 'layer'),
-                                                     sourceCellsPerColumn= 1,
-                                                     sourceCellOffset= -tm.numberOfCells())
-
-            syns = [seg['synapses'] for seg in apicalSegments]
-
-            regions['tm']['layer'].update({
-                'apicalSegments': apicalSegments,
-                "nApicalLearningThreshold": tm.minThreshold,
-                "nApicalStimulusThreshold": tm.activationThreshold,
-            })
+                if getDistalSegments:
+                    onlySources = prevState['regions']['tm']['layer']['activeCells']
+                    sourcePath = ('regions', 'tm', 'layer')
+                    distalSegments = segmentsFromConnections(tm.connections, tm,
+                                                             columnsToCheck, onlySources,
+                                                             sourcePath,
+                                                             tm.cellsPerColumn)
+                    regions['tm']['layer'].update({
+                        'distalSegments': distalSegments,
+                        "nDistalLearningThreshold": tm.minThreshold,
+                        "nDistalStimulusThreshold": tm.activationThreshold,
+                    })
+                if getApicalSegments:
+                    onlySources = prevState['regions']['pseudo']['layer']['activeCells']
+                    sourcePath = ('regions', 'pseudo', 'layer')
+                    sourceCellsPerColumn = 1
+                    sourceCellOffset = -tm.numberOfCells()
+                    apicalSegments = segmentsFromConnections(tm.apicalConnections, tm,
+                                                             columnsToCheck, onlySources,
+                                                             sourcePath,
+                                                             sourceCellsPerColumn,
+                                                             sourceCellOffset)
+                    regions['tm']['layer'].update({
+                        'apicalSegments': apicalSegments,
+                        "nApicalLearningThreshold": tm.minThreshold,
+                        "nApicalStimulusThreshold": tm.activationThreshold,
+                    })
+            except StopIteration:
+                # No previous timestep available.
+                pass
 
         return {
             'senses': senses,

@@ -44,8 +44,9 @@ class UnionPoolingExperimentVizModel(VizModel):
         else:
             return []
 
-    def query(self, getNetworkLayout=False, getBitStates=False, getProximalSynapses=False,
-              proximalSynapsesQuery={}, getDistalSegments=False, distalSegmentsQuery={},
+    def query(self, bitHistory, getNetworkLayout=False, getBitStates=False,
+              getProximalSynapses=False, proximalSynapsesQuery={},
+              getDistalSegments=False, distalSegmentsQuery={},
               getApicalSegments=False, apicalSegmentsQuery={}):
         senses = {
             'input': {}
@@ -132,21 +133,26 @@ class UnionPoolingExperimentVizModel(VizModel):
 
         if getDistalSegments:
             assert getBitStates
-
-            columnsToCheck = (regions['tm']['layer']['activeColumns'] |
-                              distalSegmentsQuery['regions']['tm']['layer']['additionalColumns'])
-            onlyTargets = distalSegmentsQuery['regions']['tm']['layer']['targets']
-
-            distalSegments = segmentsFromConnections(tm.connections, tm, columnsToCheck,
-                                                     onlyTargets,
-                                                     sourcePath=('regions', 'tm', 'layer'),
-                                                     sourceCellsPerColumn = tm.cellsPerColumn)
-
-            regions['tm']['layer'].update({
-                'distalSegments': distalSegments,
-                "nDistalLearningThreshold": tm.minThreshold,
-                "nDistalStimulusThreshold": tm.activationThreshold,
-            })
+            try:
+                prevState = bitHistory.next()
+                columnsToCheck = (regions['tm']['layer']['activeColumns'] |
+                                  prevState['regions']['tm']['layer']['predictedColumns'])
+                onlySources = prevState['regions']['tm']['layer']['activeCells']
+                sourcePath = ('regions', 'tm', 'layer')
+                sourceCellsPerColumn = tm.cellsPerColumn
+                distalSegments = segmentsFromConnections(tm.connections, tm,
+                                                         columnsToCheck,
+                                                         onlySources,
+                                                         sourcePath,
+                                                         sourceCellsPerColumn)
+                regions['tm']['layer'].update({
+                    'distalSegments': distalSegments,
+                    "nDistalLearningThreshold": tm.minThreshold,
+                    "nDistalStimulusThreshold": tm.activationThreshold,
+                })
+            except StopIteration:
+                # No previous timestep available.
+                pass
 
         return {
             'senses': senses,

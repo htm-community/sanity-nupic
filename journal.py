@@ -37,7 +37,7 @@ class Journal(object):
         vizModel.addEventListener('didStep', lambda: self.append(vizModel))
 
     def absorbStepTemplate(self, vizModel):
-        self.stepTemplate = vizModel.query(getNetworkLayout=True)
+        self.stepTemplate = vizModel.query(self.getBitHistory, getNetworkLayout=True)
         senses = {}
         for name, senseData in self.stepTemplate["senses"].items():
             senses[Keyword(name)] = {
@@ -60,8 +60,35 @@ class Journal(object):
             Keyword("regions"): regions,
         }
 
+    def getBitHistory(self):
+        # Don't store this return value for too long.
+        # It's invalid after self.journal is modified.
+        for entry in reversed(self.journal):
+            ret = {
+                'senses': {},
+                'regions': {},
+            }
+
+            for senseName, senseData in entry['senses'].items():
+                ret['senses'][senseName] = {
+                    'activeBits': senseData['activeBits'],
+                }
+
+            for regionName, regionData in entry['regions'].items():
+                ret['regions'][regionName] = {}
+                for layerName, layerData in regionData.items():
+                    ret['regions'][regionName][layerName] = {
+                        'activeCells': layerData['activeCells'],
+                        'activeColumns': layerData['activeColumns'],
+                        'predictedCells': layerData['predictedCells'],
+                        'predictedColumns': layerData['predictedColumns'],
+                    }
+
+            yield ret
+
     def append(self, vizModel):
         queryArgs = {
+            'bitHistory': self.getBitHistory(),
             'getBitStates': True,
         }
 
@@ -78,56 +105,14 @@ class Journal(object):
                 },
             })
 
-        if (len(self.journal) > 0 and
-            self.captureOptions[Keyword("distal-synapses")][Keyword("capture?")]):
-
-            distalSegmentsQuery = {
-                'senses': {},
-                'regions': {},
-            }
-
-            for senseName, prevSenseData in self.journal[-1]['senses'].items():
-                distalSegmentsQuery['senses'][senseName] = {
-                    'targets': prevSenseData['activeBits'],
-                }
-
-            for regionName, prevRegionData in self.journal[-1]['regions'].items():
-                distalSegmentsQuery['regions'][regionName] = {}
-                for layerName, prevLayerData in prevRegionData.items():
-                    distalSegmentsQuery['regions'][regionName][layerName] = {
-                        'targets': prevLayerData['activeCells'],
-                        'additionalColumns': prevLayerData['predictedColumns'],
-                    }
-
+        if self.captureOptions[Keyword("distal-synapses")][Keyword("capture?")]:
             queryArgs.update({
                 'getDistalSegments': True,
-                'distalSegmentsQuery': distalSegmentsQuery,
             })
 
-        if (len(self.journal) > 0 and
-            self.captureOptions[Keyword("apical-synapses")][Keyword("capture?")]):
-
-            apicalSegmentsQuery = {
-                'senses': {},
-                'regions': {},
-            }
-
-            for senseName, prevSenseData in self.journal[-1]['senses'].items():
-                apicalSegmentsQuery['senses'][senseName] = {
-                    'targets': prevSenseData['activeBits'],
-                }
-
-            for regionName, prevRegionData in self.journal[-1]['regions'].items():
-                apicalSegmentsQuery['regions'][regionName] = {}
-                for layerName, prevLayerData in prevRegionData.items():
-                    apicalSegmentsQuery['regions'][regionName][layerName] = {
-                        'targets': prevLayerData['activeCells'],
-                        'additionalColumns': prevLayerData['predictedColumns'],
-                    }
-
+        if self.captureOptions[Keyword("apical-synapses")][Keyword("capture?")]:
             queryArgs.update({
                 'getApicalSegments': True,
-                'apicalSegmentsQuery': apicalSegmentsQuery,
             })
 
         # TODO: grab the specified synapse types
