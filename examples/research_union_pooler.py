@@ -9,11 +9,11 @@ from nupic.data.generators.pattern_machine import PatternMachine
 from nupic.data.generators.sequence_machine import SequenceMachine
 
 from htmsanity.nupic.runner import startRunner
-from htmsanity.nupic.model import VizModel, proximalSynapsesFromSP, segmentsFromConnections
+from htmsanity.nupic.model import SanityModel, proximalSynapsesFromSP, segmentsFromConnections
 
-class UnionPoolingExperimentVizModel(VizModel):
+class UnionPoolingExperimentSanityModel(SanityModel):
     def __init__(self, experiment, patterns, labels):
-        super(UnionPoolingExperimentVizModel, self).__init__()
+        super(UnionPoolingExperimentSanityModel, self).__init__()
         self.experiment = experiment
         self.patterns = patterns
         self.labels = labels
@@ -164,5 +164,5 @@ if __name__ == '__main__':
     labels = list(numbers) * 100
 
     # TODO: show higher-level sequence *and* current value in display text.
-    vizModel = UnionPoolingExperimentVizModel(experiment, inputs, labels)
-    startRunner(vizModel, 24601)
+    sanityModel = UnionPoolingExperimentSanityModel(experiment, inputs, labels)
+    startRunner(sanityModel, 24601)

@@ -8,7 +8,7 @@ from nupic.research.monitor_mixin.temporal_memory_monitor_mixin import (
     TemporalMemoryMonitorMixin)
 
 from htmsanity.nupic.runner import startRunner
-from htmsanity.nupic.model import VizModel, segmentsFromConnections
+from htmsanity.nupic.model import SanityModel, segmentsFromConnections
 
 class MonitoredGeneralTemporalMemory(TemporalMemoryMonitorMixin,
                                      GeneralTemporalMemory):
@@ -98,11 +98,11 @@ def printConfusionMatrix(mat):
     print "inactive: \t ", mat[2], '\t\t\t', mat[3]
 
 
-class FeedbackExperimentVizModel(VizModel):
+class FeedbackExperimentSanityModel(SanityModel):
     def __init__(self, tm, nTrainTrials, trainSeq, trainFeedbackSeq,
                  testSeq, testFeedbackSeq, feedbackBuffer, nFeedbackActive,
                  alphabet):
-        super(FeedbackExperimentVizModel, self).__init__()
+        super(FeedbackExperimentSanityModel, self).__init__()
         self.tm = tm
         self.nTrainTrials = nTrainTrials
         self.trainSeq = trainSeq
@@ -347,10 +347,10 @@ def experiment2():
     print
 
     feedbackBuffer = 10
-    vizModel = FeedbackExperimentVizModel(tmFeedback, trials, sequences,
-                                          feedback_seq, test_sequence, testFeedback,
-                                          feedbackBuffer, feedback_n, alphabet)
-    startRunner(vizModel, 24601)
+    sanityModel = FeedbackExperimentSanityModel(tmFeedback, trials, sequences,
+                                                feedback_seq, test_sequence, testFeedback,
+                                                feedbackBuffer, feedback_n, alphabet)
+    startRunner(sanityModel, 24601)
 
 if __name__ == "__main__":
     experiment2()

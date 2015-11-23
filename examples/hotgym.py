@@ -3,7 +3,7 @@ import csv
 import os
 
 from htmsanity.nupic.runner import startRunner
-from htmsanity.nupic.model import CLAVizModel
+from htmsanity.nupic.model import CLASanityModel
 from swarmed_model_params import MODEL_PARAMS
 
 from nupic.frameworks.opf.metrics import MetricSpec
@@ -25,7 +25,7 @@ _METRIC_SPECS = (
                params={'errorMetric': 'altMAPE', 'window': 1000, 'steps': 1}),
 )
 
-class HotGym(CLAVizModel):
+class HotGym(CLASanityModel):
     def __init__(self, model, inputs):
         super(HotGym, self).__init__(model)
         self.model = model

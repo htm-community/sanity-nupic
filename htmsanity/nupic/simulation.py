@@ -3,15 +3,15 @@ import threading
 def simulationThread(simulation, checkEvent):
     while True:
         while simulation.isGoing:
-            ret = simulation.vizModel.doStep()
+            ret = simulation.sanityModel.doStep()
             if ret is False:
                 return
         checkEvent.wait()
         checkEvent.clear()
 
 class Simulation(object):
-    def __init__(self, vizModel):
-        self.vizModel = vizModel
+    def __init__(self, sanityModel):
+        self.sanityModel = sanityModel
         self.statusSubscribers = []
         self.isGoing = False
         self.checkStatusEvent = threading.Event()
@@ -41,7 +41,7 @@ class Simulation(object):
             self.onStatusChanged()
         elif command == "step":
             if not self.isGoing:
-                self.vizModel.doStep()
+                self.sanityModel.doStep()
         elif command == "subscribe-to-status":
             subscriberChannel, = args
             self.statusSubscribers.append(subscriberChannel)

@@ -5,7 +5,7 @@ from collections import deque
 import os
 
 from htmsanity.nupic.runner import startRunner
-from htmsanity.nupic.model import CLAVizModel
+from htmsanity.nupic.model import CLASanityModel
 from swarmed_model_params import MODEL_PARAMS
 
 from nupic.data.inference_shifter import InferenceShifter
@@ -36,7 +36,7 @@ _METRIC_SPECS = (
 
 WINDOW = 100
 
-class HotGym(CLAVizModel):
+class HotGym(CLASanityModel):
     def __init__(self, model, inputs):
         super(HotGym, self).__init__(model)
         self.model = model

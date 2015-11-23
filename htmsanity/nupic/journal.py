@@ -1,13 +1,13 @@
 from transit.transit_types import Keyword
 
-def makeStep(vizModel, modelId):
+def makeStep(sanityModel, modelId):
     return {
         Keyword("model-id"): modelId,
-        Keyword("timestep"): vizModel.timestep,
+        Keyword("timestep"): sanityModel.timestep,
     }
 
 class Journal(object):
-    def __init__(self, vizModel):
+    def __init__(self, sanityModel):
         self.journal = []
         self.subscribers = []
         self.nextModelId = 0
@@ -32,12 +32,12 @@ class Journal(object):
             },
         }
 
-        self.absorbStepTemplate(vizModel)
-        self.append(vizModel)
-        vizModel.addEventListener('didStep', lambda: self.append(vizModel))
+        self.absorbStepTemplate(sanityModel)
+        self.append(sanityModel)
+        sanityModel.addEventListener('didStep', lambda: self.append(sanityModel))
 
-    def absorbStepTemplate(self, vizModel):
-        self.stepTemplate = vizModel.query(self.getBitHistory, getNetworkLayout=True)
+    def absorbStepTemplate(self, sanityModel):
+        self.stepTemplate = sanityModel.query(self.getBitHistory, getNetworkLayout=True)
         senses = {}
         for name, senseData in self.stepTemplate["senses"].items():
             senses[Keyword(name)] = {
@@ -86,7 +86,7 @@ class Journal(object):
 
             yield ret
 
-    def append(self, vizModel):
+    def append(self, sanityModel):
         queryArgs = {
             'bitHistory': self.getBitHistory(),
             'getBitStates': True,
@@ -114,14 +114,14 @@ class Journal(object):
 
         # TODO: grab the specified synapse types
 
-        self.journal.append(vizModel.query(**queryArgs))
+        self.journal.append(sanityModel.query(**queryArgs))
 
         # TODO: only keep nKeepSteps models
 
-        step = makeStep(vizModel, self.nextModelId)
+        step = makeStep(sanityModel, self.nextModelId)
         self.nextModelId += 1
 
-        step[Keyword("display-value")] = vizModel.getInputDisplayText()
+        step[Keyword("display-value")] = sanityModel.getInputDisplayText()
 
         for subscriber in self.subscribers:
             subscriber.put(step)

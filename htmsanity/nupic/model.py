@@ -4,7 +4,7 @@ from collections import deque
 import numpy
 from nupic.bindings.math import GetNTAReal
 
-class VizModel(object):
+class SanityModel(object):
     __metaclass__ = ABCMeta
 
     def __init__(self):
@@ -177,11 +177,11 @@ def distalSegmentsFromTP(tp, sourceColumns, targetBits, sourcePath):
 
     return distalSegments
 
-class CLAVizModel(VizModel):
+class CLASanityModel(SanityModel):
     __metaclass__ = ABCMeta
 
     def __init__(self, model):
-        super(CLAVizModel, self).__init__()
+        super(CLASanityModel, self).__init__()
         self.model = model
 
     def query(self, bitHistory, getNetworkLayout=False, getBitStates=False,

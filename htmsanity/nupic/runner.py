@@ -10,9 +10,9 @@ from simulation import Simulation
 from journal import Journal
 from websocket import makeVizWebSocketClass
 
-def startRunner(vizModel, port, useBackgroundThread=False):
-    journal = Journal(vizModel)
-    simulation = Simulation(vizModel)
+def startRunner(sanityModel, port, useBackgroundThread=False):
+    journal = Journal(sanityModel)
+    simulation = Simulation(sanityModel)
 
     localTargets = {
         Keyword("into-sim"): lambda x: simulation.handleMessage(x),
