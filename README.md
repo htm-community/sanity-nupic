@@ -1,46 +1,59 @@
-# comportexviz-nupic
+# sanity-nupic
 
 Clone this repo, and fetch the submodules:
 
 ~~~
-cd comportexviz-nupic
+cd sanity-nupic
 git submodule update --init --recursive
 ~~~
 
 Install NuPIC. [Instructions](https://github.com/numenta/nupic)
 
-Install dependencies:
+Install `htmsanity-nupic`;
 
 ~~~
-pip install Twisted --user
-pip install autobahn --user
-pip install transit-python --user
+python setup.py develop --user
 ~~~
 
-Compile ComportexViz, or download a compiled version [here](http://mrcslws.com/stuff/comportexviz.6387216.zip).
+Now run your HTM model. Here are some examples:
 
 ~~~
-# Optional, requires JVM
+# Hello world
+python examples/hotgym.py
+
+# Requires matplotlib
+python examples/hotgym_plotted.py
+
+# Requires nupic.research
+python examples/research_feedback.py
+~~~
+
+To view it, you need to host `index.html` and `comportexviz`.
+
+## Client option 1: Compile comportexviz
+
+~~~
+# Requires JVM
 cd comportexviz
 lein cljsbuild once demos
 cd ..
 ~~~
 
-If you downloaded it, copy the "out" folder into `comportexviz/public/demos/`. The webpage will look for the path `comportexviz/public/demos/out/comportexviz.js` on the server below.
-
-Host the root folder (`comportexviz-nupic`) on a local webserver:
+Now just host the root folder `sanity-nupic` on a local webserver.
 
 ~~~
 python -m SimpleHTTPServer 8000
 ~~~
 
-In another terminal window, choose and run a demo:
+Navigate to http://localhost:8000
+
+## Client option 2: Download and unzip
+
+Download [this folder](http://mrcslws.com/stuff/sanity-client.a28431d.zip), unzip it, and host it on a local webserver.
 
 ~~~
-python examples/hotgym.py
-
-# I recommend this one, but I don't want to help you install matplotlib.
-# python examples/hotgym_plotted.py
+cd sanity-client.a28431d
+python -m SimpleHTTPServer 8000
 ~~~
 
 Navigate to http://localhost:8000

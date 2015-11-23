@@ -1,0 +1,4 @@
+# Program requirements
+Twisted
+autobahn
+transit-python

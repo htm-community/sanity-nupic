@@ -7,11 +7,8 @@ from htmresearch.algorithms.general_temporal_memory import GeneralTemporalMemory
 from nupic.research.monitor_mixin.temporal_memory_monitor_mixin import (
     TemporalMemoryMonitorMixin)
 
-import os, sys
-sys.path.insert(1, os.path.join(sys.path[0], '..'))
-
-import runner
-from model import VizModel, proximalSynapsesFromSP, segmentsFromConnections
+from htmsanity.nupic.runner import startRunner
+from htmsanity.nupic.model import VizModel, segmentsFromConnections
 
 class MonitoredGeneralTemporalMemory(TemporalMemoryMonitorMixin,
                                      GeneralTemporalMemory):
@@ -353,7 +350,7 @@ def experiment2():
     vizModel = FeedbackExperimentVizModel(tmFeedback, trials, sequences,
                                           feedback_seq, test_sequence, testFeedback,
                                           feedbackBuffer, feedback_n, alphabet)
-    runner.startRunner(vizModel, 24601)
+    startRunner(vizModel, 24601)
 
 if __name__ == "__main__":
     experiment2()

@@ -8,11 +8,8 @@ from htmresearch.frameworks.union_temporal_pooling.union_temporal_pooler_experim
 from nupic.data.generators.pattern_machine import PatternMachine
 from nupic.data.generators.sequence_machine import SequenceMachine
 
-import os, sys
-sys.path.insert(1, os.path.join(sys.path[0], '..'))
-
-import runner
-from model import VizModel, proximalSynapsesFromSP, segmentsFromConnections
+from htmsanity.nupic.runner import startRunner
+from htmsanity.nupic.model import VizModel, proximalSynapsesFromSP, segmentsFromConnections
 
 class UnionPoolingExperimentVizModel(VizModel):
     def __init__(self, experiment, patterns, labels):
@@ -168,4 +165,4 @@ if __name__ == '__main__':
 
     # TODO: show higher-level sequence *and* current value in display text.
     vizModel = UnionPoolingExperimentVizModel(experiment, inputs, labels)
-    runner.startRunner(vizModel, 24601)
+    startRunner(vizModel, 24601)

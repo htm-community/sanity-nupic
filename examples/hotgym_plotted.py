@@ -2,12 +2,10 @@ import datetime
 import csv
 import threading
 from collections import deque
+import os
 
-import os, sys
-sys.path.insert(1, os.path.join(sys.path[0], '..'))
-
-import runner
-from model import CLAVizModel
+from htmsanity.nupic.runner import startRunner
+from htmsanity.nupic.model import CLAVizModel
 from swarmed_model_params import MODEL_PARAMS
 
 from nupic.data.inference_shifter import InferenceShifter
@@ -145,5 +143,5 @@ if __name__ == '__main__':
     csvReader.next()
     csvReader.next()
 
-    runner.startRunner(HotGym(model, csvReader), 24601, useBackgroundThread=True)
+    startRunner(HotGym(model, csvReader), 24601, useBackgroundThread=True)
     plt.show()
