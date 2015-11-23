@@ -49,7 +49,6 @@ class UnionPoolingExperimentVizModel(VizModel):
               getDistalSegments=False, distalSegmentsQuery={},
               getApicalSegments=False, apicalSegmentsQuery={}):
         senses = {
-            'input': {}
         }
         regions = {
             'tm': {'layer': {}},
@@ -60,21 +59,16 @@ class UnionPoolingExperimentVizModel(VizModel):
         up = self.experiment.up
 
         if getNetworkLayout:
-            senses['input'].update({
-                'dimensions': tm.columnDimensions,
-                'ordinal': 0,
-            })
-
             regions['tm']['layer'].update({
                 'cellsPerColumn': tm.cellsPerColumn,
                 'dimensions': tm.columnDimensions,
-                'ordinal': 1,
+                'ordinal': 0,
             })
 
             regions['up']['layer'].update({
                 'cellsPerColumn': 1,
                 'dimensions': up.getColumnDimensions().tolist(),
-                'ordinal': 2,
+                'ordinal': 1,
             })
 
         if getBitStates:
@@ -83,10 +77,6 @@ class UnionPoolingExperimentVizModel(VizModel):
                 pattern = self.patterns[self.lastInputIndex]
                 if pattern:
                     activeBits = set(pattern)
-
-            senses['input'].update({
-                'activeBits': activeBits,
-            })
 
             predictiveCells = set(tm.predictiveCells)
             predictiveColumns = set(cell / tm.cellsPerColumn for cell in predictiveCells)

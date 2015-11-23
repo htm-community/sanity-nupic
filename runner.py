@@ -4,7 +4,6 @@ import threading
 from autobahn.twisted.websocket import WebSocketServerFactory
 from transit.transit_types import Keyword
 from twisted.internet import reactor
-from twisted.python import log
 
 from simulation import Simulation
 from journal import Journal
@@ -22,7 +21,6 @@ def startRunner(vizModel, port, useBackgroundThread=False):
     port = 24601
     factory = WebSocketServerFactory("ws://127.0.0.1:{0}".format(port), debug=False)
     factory.protocol = makeVizWebSocketClass(localTargets)
-    log.startLogging(sys.stdout)
     reactor.listenTCP(port, factory)
 
     if useBackgroundThread:

@@ -197,7 +197,6 @@ class FeedbackExperimentVizModel(VizModel):
               getDistalSegments=False, distalSegmentsQuery={},
               getApicalSegments=False, apicalSegmentsQuery={}):
         senses = {
-            'input': {}
         }
         regions = {
             'tm': {'layer': {}},
@@ -207,21 +206,16 @@ class FeedbackExperimentVizModel(VizModel):
         tm = self.tm
 
         if getNetworkLayout:
-            senses['input'].update({
-                'dimensions': tm.columnDimensions,
-                'ordinal': 0,
-            })
-
             regions['tm']['layer'].update({
                 'cellsPerColumn': tm.cellsPerColumn,
                 'dimensions': tm.columnDimensions,
-                'ordinal': 1,
+                'ordinal': 0,
             })
 
             regions['pseudo']['layer'].update({
                 'cellsPerColumn': 1,
                 'dimensions': [2048],
-                'ordinal': 2,
+                'ordinal': 1,
             })
 
         if getBitStates:
@@ -245,10 +239,6 @@ class FeedbackExperimentVizModel(VizModel):
             activeBits = set()
             if pattern is not None:
                 activeBits = set(pattern)
-
-            senses['input'].update({
-                'activeBits': activeBits,
-            })
 
             predictiveCells = set(tm.predictiveCells)
             predictiveColumns = set(cell / tm.cellsPerColumn for cell in predictiveCells)
