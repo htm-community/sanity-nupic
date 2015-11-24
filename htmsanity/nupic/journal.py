@@ -200,6 +200,7 @@ class Journal(object):
                             syn.update({
                                 Keyword("src-col"): sourceColumn,
                                 Keyword("perm"): perm,
+                                Keyword("src-dt"): 1, # TODO don't assume this
                             })
                             synapsesByColumn[column].append(syn)
 
@@ -312,6 +313,7 @@ class Journal(object):
                         syn.update({
                             Keyword("src-col"): targetCol,
                             Keyword("perm"): perm,
+                            Keyword("src-dt"): 1, # TODO don't assume this
                         })
                         activeSynapses.append(syn)
 
