@@ -28,13 +28,13 @@ python examples/hotgym_plotted.py
 python examples/research_feedback.py
 ~~~
 
-To view it, you need to host `index.html` and `comportexviz`.
+To view it, you need to host `index.html` and `sanity`.
 
-## Client option 1: Compile comportexviz
+## Client option 1: Compile Sanity
 
 ~~~
 # Requires JVM
-cd comportexviz
+cd sanity
 lein cljsbuild once demos
 cd ..
 ~~~
@@ -49,10 +49,10 @@ Navigate to http://localhost:8000
 
 ## Client option 2: Download and unzip
 
-Download [this folder](http://mrcslws.com/stuff/sanity-client.a28431d.zip), unzip it, and host it on a local webserver.
+Download [this folder](http://mrcslws.com/stuff/sanity-client.7d4513c.zip), unzip it, and host it on a local webserver.
 
 ~~~
-cd sanity-client.a28431d
+cd sanity-client.7d4513c
 python -m SimpleHTTPServer 8000
 ~~~
 
