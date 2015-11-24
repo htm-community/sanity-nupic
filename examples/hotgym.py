@@ -2,7 +2,7 @@ import datetime
 import csv
 import os
 
-from htmsanity.nupic.runner import startRunner
+from htmsanity.nupic.runner import SanityRunner
 from htmsanity.nupic.model import CLASanityModel
 from swarmed_model_params import MODEL_PARAMS
 
@@ -74,4 +74,5 @@ if __name__ == '__main__':
     csvReader.next()
     csvReader.next()
 
-    startRunner(HotGym(model, csvReader), 24601)
+    runner = SanityRunner(HotGym(model, csvReader))
+    runner.start(port=24601)

@@ -57,3 +57,43 @@ python examples/research_feedback.py
 ~~~
 
 Now navigate to `http://localhost:8000`
+
+## Use
+
+Here's an example that visualizes a CLAModel.
+
+~~~python
+from nupic.frameworks.opf.modelfactory import ModelFactory
+
+from htmsanity.nupic.runner import SanityRunner
+from htmsanity.nupic.model import CLASanityModel
+
+# You create something like this.
+class HelloModel(CLASanityModel):
+    def __init__(self):
+        MODEL_PARAMS = {
+            # Your choice
+        }
+        self.model = ModelFactory.create(MODEL_PARAMS)
+        self.lastInput = -1
+        super(HelloModel, self).__init__(self.model)
+
+    def step(self):
+        self.lastInput = (self.lastInput + 1) % 12
+        self.model.run({
+            'myInput': self.lastInput,
+        })
+
+    def getInputDisplayText(self):
+        return {
+            'myInput': self.lastInput,
+        }
+
+sanityModel = HelloModel()
+runner = SanityRunner(sanityModel)
+runner.start()
+~~~
+
+For a real-world CLAModel example, see [hotgym](examples/hotgym.py) or [hotgym plotted](examples/hotgym_plotted.py).
+
+For custom models, you'll want to create your own SanityModel. Read the documentation [in the code](htmsanity/nupic/model.py), and look at the [research](examples/research_feedback.py) [examples](examples/research_union_pooler.py).

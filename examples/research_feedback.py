@@ -7,7 +7,7 @@ from htmresearch.algorithms.general_temporal_memory import GeneralTemporalMemory
 from nupic.research.monitor_mixin.temporal_memory_monitor_mixin import (
     TemporalMemoryMonitorMixin)
 
-from htmsanity.nupic.runner import startRunner
+from htmsanity.nupic.runner import SanityRunner
 from htmsanity.nupic.model import SanityModel, segmentsFromConnections
 
 class MonitoredGeneralTemporalMemory(TemporalMemoryMonitorMixin,
@@ -350,7 +350,8 @@ def experiment2():
     sanityModel = FeedbackExperimentSanityModel(tmFeedback, trials, sequences,
                                                 feedback_seq, test_sequence, testFeedback,
                                                 feedbackBuffer, feedback_n, alphabet)
-    startRunner(sanityModel, 24601)
+    runner = SanityRunner(sanityModel)
+    runner.start(port=24601)
 
 if __name__ == "__main__":
     experiment2()

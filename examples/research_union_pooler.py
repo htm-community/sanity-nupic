@@ -8,7 +8,7 @@ from htmresearch.frameworks.union_temporal_pooling.union_temporal_pooler_experim
 from nupic.data.generators.pattern_machine import PatternMachine
 from nupic.data.generators.sequence_machine import SequenceMachine
 
-from htmsanity.nupic.runner import startRunner
+from htmsanity.nupic.runner import SanityRunner
 from htmsanity.nupic.model import SanityModel, proximalSynapsesFromSP, segmentsFromConnections
 
 class UnionPoolingExperimentSanityModel(SanityModel):
@@ -96,8 +96,8 @@ class UnionPoolingExperimentSanityModel(SanityModel):
             assert getBitStates
             upSynapses = proximalSynapsesFromSP(up,
                                                 regions['tm']['layer']['activeCells'],
-                                                proximalSynapsesQuery['onlyActive'],
-                                                proximalSynapsesQuery['onlyConnected'],
+                                                proximalSynapsesQuery['onlyActiveSynapses'],
+                                                proximalSynapsesQuery['onlyConnectedSynapses'],
                                                 targetDepth=tm.cellsPerColumn)
             regions['up']['layer'].update({
                 'proximalSynapses': {
@@ -165,4 +165,5 @@ if __name__ == '__main__':
 
     # TODO: show higher-level sequence *and* current value in display text.
     sanityModel = UnionPoolingExperimentSanityModel(experiment, inputs, labels)
-    startRunner(sanityModel, 24601)
+    runner = SanityRunner(sanityModel)
+    runner.start(port=24601)
