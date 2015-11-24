@@ -97,8 +97,8 @@ class Journal(object):
             queryArgs.update({
                 'getProximalSynapses': True,
                 'proximalSynapsesQuery': {
-                    'onlyActive': onlyActive,
-                    'onlyConnected': True,
+                    'onlyActiveSynapses': onlyActive,
+                    'onlyConnectedSynapses': True,
                 },
             })
 

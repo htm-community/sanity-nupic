@@ -5,6 +5,11 @@ import numpy
 from nupic.bindings.math import GetNTAReal
 
 class SanityModel(object):
+    """
+    Abstract base class. A SanityModel serves two functions:
+     - Describe an HTM model in terms of layers and senses
+     - Step the model
+    """
     __metaclass__ = ABCMeta
 
     def __init__(self):
@@ -36,9 +41,13 @@ class SanityModel(object):
 
     @abstractmethod
     def step(self):
-        """Run one input through the HTM.
+        """
+        Run one input through the HTM.
 
-        If there are no more inputs, return False.
+        Returns
+        -------
+        bool
+          If there are no more inputs, return False.
         """
 
     @abstractmethod
@@ -47,11 +56,156 @@ class SanityModel(object):
               getDistalSegments=False, distalSegmentsQuery={},
               getApicalSegments=False, apicalSegmentsQuery={}):
         """
+        Describe the model's state in terms of layers and senses.
+
+        Parameters
+        ----------
+        bitHistory : iterator
+          Provides access to getBitStates return values for previous timesteps.
+          The first call to bitHistory.next() returns t - 1, the second t - 2, etc.
+          This iterator is only valid for the duration of this query.
+        getNetworkLayout : bool
+          Whether to fetch this set of values. See the annotated return example.
+        getProximalSynapses : bool
+          Whether to fetch this set of values. See the annotated return example.
+        getDistalSegments : bool
+          Whether to fetch this set of values. See the annotated return example.
+        getApicalSegments : bool
+          Whether to fetch this set of values. See the annotated return example.
+        proximalSynapsesQuery : dict
+          Details for the getProximalSynapses.
+          Example value:
+            {
+                'onlyActiveSynapses': True,
+                'onlyConnectedSynapses': True,
+            }
+        distalSegmentsQuery : dict
+          Details for the getDistalSegments.
+          Example value:
+            {
+                'onlyActiveSynapses': True,
+                'onlyConnectedSynapses': True,
+                # Open to interpretation. Recommended: active and predicted columns.
+                'onlyNoteworthyColumns': True,
+            }
+        apicalSegmentsQuery : dict
+          Details for the getApicalSegments.
+          Example value:
+            {
+                'onlyActiveSynapses': True,
+                'onlyConnectedSynapses': True,
+                # Open to interpretation. Recommended: active and predicted columns.
+                'onlyNoteworthyColumns': True,
+            }
+
+        Returns
+        -------
+        dict
+          The result of the query. See the annotated example.
+
+        Here's a sample return value, annotated with the query parameter that
+        summons each part:
+
+        {
+            'senses': {
+                'mySense1': {
+                    # getNetworkLayout
+                    'ordinal': 0, # Display order
+                    'dimensions': (200,),
+
+                    # getBitStates
+                    'activeBits': set([159, 160, 161,])
+                }
+            }
+            'regions': {
+                'myRegion1': {
+                    'myLayer3': {
+                        # getNetworkLayout
+                        'ordinal': 1, # Display order
+                        'cellsPerColumn': 32,
+                        'dimensions': (20,),
+
+                        # getBitStates
+                        'activeCells': set([0, 1, 2,]),
+                        'activeColumns': set([0, 4, 5, 6, 9, 10,]),
+                        'predictedColumns': set([])
+                        'predictedCells': set([]),
+
+                        # getProximalSynapses
+                        'proximalSynapses': {
+                            # Path to presynaptic layer / sense
+                            ('senses', 'mySense1'): {
+                                'active': [
+                                    # Tuple:
+                                    # - Column
+                                    # - Presynaptic column
+                                    # - Permanence
+                                    (0, 160, 0.25),
+                                    (19, 74, 0.47296399),
+                                ],
+                                'disconnected': [],
+                                'inactive-syn': [],
+                            }},
+
+                        # getApicalSegments
+                        'nDistalStimulusThreshold': 13,
+                        'nDistalLearningThreshold': 9,
+                        'apicalSegments': [
+                            # Same format as distalSegments
+                        ],
+
+                        # getDistalSegments
+                        'nDistalStimulusThreshold': 13,
+                        'nDistalLearningThreshold': 9,
+                        'distalSegments': [
+                            {
+                                'column': 0,
+                                'cell': 9,
+                                'nDisconnectedActive': 0,
+                                'nDisconnectedTotal': 0,
+                                'nConnectedActive': 6,
+                                'nConnectedTotal': 10
+                                'synapses': {
+                                    # Path to presynaptic layer / sense
+                                    ('regions', 'myRegion1', 'myLayer3'): [
+                                        # Tuple:
+                                        # - Presynaptic column
+                                        # - Presynaptic cell (within column)
+                                        # - Permanence
+                                        (0, 25, 0.7100000381469727),
+                                        (4, 10, 0.7100000381469727),
+                                    ]
+                                },
+                            },
+                            {
+                                'column': 0,
+                                'cell': 10,
+                                'nDisconnectedTotal': 10,
+                                'nDisconnectedActive': 7,
+                                'nConnectedActive': 0,
+                                'nConnectedTotal': 0
+                                'synapses': {
+                                    ('regions', 'myRegion1', 'myLayer3'): []
+                                },
+                            },
+                        ],
+
+                    }
+                }
+            },
+        }
         """
 
     @abstractmethod
     def getInputDisplayText(self):
-        """Return the most recent input as a dictionary or a list of key-value pairs.
+        """
+        Get the most recent input as a collection of key value pairs.
+        The keys and values will be displayed as text.
+
+        Returns
+        -------
+        dict or sequence
+          Key value pairs. Use a sequential collection to control the display order.
         """
 
 def proximalSynapsesFromSP(sp, activeBits, onlyActiveSynapses,
@@ -178,6 +332,9 @@ def distalSegmentsFromTP(tp, sourceColumns, targetBits, sourcePath):
     return distalSegments
 
 class CLASanityModel(SanityModel):
+    """
+    Abstract base class. Implements the query method for CLAModels.
+    """
     __metaclass__ = ABCMeta
 
     def __init__(self, model):
@@ -222,10 +379,12 @@ class CLASanityModel(SanityModel):
 
         if getProximalSynapses:
             assert getBitStates
+            onlyActiveSynapses = proximalSynapsesQuery['onlyActiveSynapses']
+            onlyConnectedSynapses = proximalSynapsesQuery['onlyConnectedSynapses']
             proximalSynapses = proximalSynapsesFromSP(sp,
                                                       senses['concatenated']['activeBits'],
-                                                      proximalSynapsesQuery['onlyActive'],
-                                                      proximalSynapsesQuery['onlyConnected'])
+                                                      onlyActiveSynapses,
+                                                      onlyConnectedSynapses)
 
             regions['rgn-0']['layer-3'].update({
                 'proximalSynapses': {
