@@ -206,6 +206,12 @@ class SanityModel(object):
         -------
         dict or sequence
           Key value pairs. Use a sequential collection to control the display order.
+
+        Example:
+          [
+              ("stage", "Train (trial 9 of 10)"),
+              ("input", "squealed"),
+          ]
         """
 
 def proximalSynapsesFromSP(sp, activeBits, onlyActiveSynapses,
