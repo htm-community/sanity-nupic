@@ -15,12 +15,12 @@ def findRequirements():
     if not line.startswith("#")
   ]
 
-setup(name="htmsanity-nupic",
+setup(name="sanity-nupic",
       version="0.0.1",
       description="NuPIC server for Sanity client",
       author="Marcus Lewis",
       author_email="mrcslws@gmail.com",
-      url="https://github.com/mrcslws/comportexviz-nupic",
+      url="https://github.com/nupic-community/sanity-nupic/",
       packages=find_packages(),
       install_requires=findRequirements(),
      )
