@@ -1,4 +1,4 @@
-# sanity-nupic
+# Sanity for NuPIC
 
 A [NuPIC](https://github.com/numenta/nupic) backend for [Sanity](https://github.com/nupic-community/sanity).
 
