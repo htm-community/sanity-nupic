@@ -1,4 +1,4 @@
-[submodule "comportexviz"]
-	path = comportexviz
-	url = https://github.com/nupic-community/comportexviz.git
+[submodule "sanity"]
+	path = sanity
+	url = https://github.com/nupic-community/sanity.git
 	branch = master
