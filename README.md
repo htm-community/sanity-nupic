@@ -96,4 +96,4 @@ runner.start()
 
 For a real-world CLAModel example, see [hotgym](examples/hotgym.py) or [hotgym plotted](examples/hotgym_plotted.py).
 
-For custom models, you'll want to create your own SanityModel. Read the documentation [in the code](htmsanity/nupic/model.py), and look at the [research](examples/research_feedback.py) [examples](examples/research_union_pooler.py).
+For custom models, you'll want to create your own `SanityModel`. Read the documentation [in the code](htmsanity/nupic/model.py), and look at the [research](examples/research_feedback.py) [examples](examples/research_union_pooler.py).
