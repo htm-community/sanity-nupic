@@ -1,21 +1,49 @@
 # sanity-nupic
 
-Clone this repo, and fetch the submodules:
+A [NuPIC](https://github.com/numenta/nupic) backend for [Sanity](https://github.com/nupic-community/sanity).
+
+## Install
+
+Install NuPIC. [Instructions](https://github.com/numenta/nupic)
+
+Clone `sanity-nupic`, and fetch the submodules:
 
 ~~~
 cd sanity-nupic
 git submodule update --init --recursive
 ~~~
 
-Install NuPIC. [Instructions](https://github.com/numenta/nupic)
-
-Install `htmsanity-nupic`;
+Install the `sanity-nupic` python package;
 
 ~~~
 python setup.py develop --user
 ~~~
 
-Now run your HTM model. Here are some examples:
+Compile [Sanity](https://github.com/nupic-community/sanity) from ClojureScript to JavaScript.
+
+~~~
+# Requires JVM
+cd sanity
+lein cljsbuild once demos
+cd ..
+~~~
+
+If you can't handle the JVM or [Leiningen](http://leiningen.org/), you can download and host [this folder](http://mrcslws.com/stuff/sanity-client.f0540f1.zip).
+
+## Run
+
+There are two parts to this:
+
+1. Host Sanity client on a webserver.
+2. Run a NuPIC experiment.
+
+For part 1, you can just host the `sanity-nupic` folder. Make sure you've compiled Sanity.
+
+~~~
+python -m SimpleHTTPServer 8000
+~~~
+
+For part 2, here are some examples:
 
 ~~~
 # Hello world
@@ -28,32 +56,4 @@ python examples/hotgym_plotted.py
 python examples/research_feedback.py
 ~~~
 
-To view it, you need to host `index.html` and `sanity`.
-
-## Client option 1: Compile Sanity
-
-~~~
-# Requires JVM
-cd sanity
-lein cljsbuild once demos
-cd ..
-~~~
-
-Now just host the root folder `sanity-nupic` on a local webserver.
-
-~~~
-python -m SimpleHTTPServer 8000
-~~~
-
-Navigate to http://localhost:8000
-
-## Client option 2: Download and unzip
-
-Download [this folder](http://mrcslws.com/stuff/sanity-client.7d4513c.zip), unzip it, and host it on a local webserver.
-
-~~~
-cd sanity-client.7d4513c
-python -m SimpleHTTPServer 8000
-~~~
-
-Navigate to http://localhost:8000
+Now navigate to `http://localhost:8000`
