@@ -219,18 +219,39 @@ def proximalSynapsesFromSP(sp, activeBits, onlyActiveSynapses,
     activeSyns = deque()
     inactiveSyns = deque()
     disconnectedSyns = deque()
-    permanence = numpy.zeros(sp.getNumInputs()).astype(GetNTAReal())
     synPermConnected = sp.getSynPermConnected()
+    synapsePotentials = numpy.zeros(sp.getNumInputs()).astype('uint32')
+    synapsePermanences = numpy.zeros(sp.getNumInputs()).astype(GetNTAReal())
+    activeMask = numpy.zeros(sp.getNumInputs(), dtype=bool)
+    activeMask[list(activeBits)] = True
     for column in range(sp.getNumColumns()):
-        sp.getPermanence(column, permanence)
-        # TODO don't just scan activeBits
-        for inputBit in activeBits:
-            isActive = True
-            isConnected = permanence[inputBit] >= synPermConnected
-            if isConnected:
+        sp.getPotential(column, synapsePotentials)
+        potentialMask = synapsePotentials == 1
+
+        sp.getPermanence(column, synapsePermanences)
+        connectedMask = synapsePermanences >= synPermConnected
+
+        activeConnectedMask = activeMask & potentialMask & connectedMask
+        for inputBit in activeConnectedMask.nonzero()[0]:
+            targetColumn = int(inputBit / targetDepth)
+            syn = (column, targetColumn, synapsePermanences[inputBit])
+            activeSyns.append(syn)
+
+        if not onlyActiveSynapses:
+            inactiveConnectedMask = ~activeMask & potentialMask & connectedMask
+            for inputBit in inactiveConnectedMask.nonzero()[0]:
                 targetColumn = int(inputBit / targetDepth)
-                syn = (column, targetColumn, permanence[inputBit])
-                activeSyns.append(syn)
+                syn = (column, targetColumn, synapsePermanences[inputBit])
+                inactiveSyns.append(syn)
+
+        if not onlyConnectedSynapses:
+            disconnectedMask = potentialMask & ~connectedMask
+            if onlyActiveSynapses:
+                disconnectedMask = disconnectedMask & activeMask
+            for inputBit in disconnectedMask.nonzero()[0]:
+                targetColumn = int(inputBit / targetDepth)
+                syn = (column, targetColumn, synapsePermanences[inputBit])
+                disconnectedSyns.append(syn)
 
     return {
         'active': activeSyns,
