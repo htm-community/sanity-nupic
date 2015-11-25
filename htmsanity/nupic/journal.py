@@ -17,19 +17,19 @@ class Journal(object):
             Keyword("keep-steps"): 50,
             Keyword("ff-synapses"): {
                 Keyword("capture?"): False,
-                Keyword("min-perm"): 0.1, # TODO
                 Keyword("only-active?"): True,
+                Keyword("only-connected?"): True,
             },
             Keyword("distal-synapses"): {
                 Keyword("capture?"): False,
-                Keyword("min-perm"): 0.5, # TODO
                 Keyword("only-active?"): True,
+                Keyword("only-connected?"): True,
                 Keyword("only-noteworthy-columns?"): True,
             },
             Keyword("apical-synapses"): {
                 Keyword("capture?"): False,
-                Keyword("min-perm"): 0.5, # TODO
                 Keyword("only-active?"): True,
+                Keyword("only-connected?"): True,
                 Keyword("only-noteworthy-columns?"): True,
             },
         }
@@ -96,31 +96,34 @@ class Journal(object):
 
         if self.captureOptions[Keyword("ff-synapses")][Keyword("capture?")]:
             onlyActive = self.captureOptions[Keyword('ff-synapses')][Keyword('only-active?')]
+            onlyConnected = self.captureOptions[Keyword('ff-synapses')][Keyword('only-connected?')]
             queryArgs.update({
                 'getProximalSynapses': True,
                 'proximalSynapsesQuery': {
                     'onlyActiveSynapses': onlyActive,
-                    'onlyConnectedSynapses': True,
+                    'onlyConnectedSynapses': onlyConnected,
                 },
             })
 
         if self.captureOptions[Keyword("distal-synapses")][Keyword("capture?")]:
             onlyActive = self.captureOptions[Keyword('distal-synapses')][Keyword('only-active?')]
+            onlyConnected = self.captureOptions[Keyword('distal-synapses')][Keyword('only-connected?')]
             queryArgs.update({
                 'getDistalSegments': True,
                 'distalSegmentsQuery': {
                     'onlyActiveSynapses': onlyActive,
-                    'onlyConnectedSynapses': True,
+                    'onlyConnectedSynapses': onlyConnected,
                 },
             })
 
         if self.captureOptions[Keyword("apical-synapses")][Keyword("capture?")]:
             onlyActive = self.captureOptions[Keyword('apical-synapses')][Keyword('only-active?')]
+            onlyConnected = self.captureOptions[Keyword('apical-synapses')][Keyword('only-connected?')]
             queryArgs.update({
                 'getApicalSegments': True,
                 'apicalSegmentsQuery': {
                     'onlyActiveSynapses': onlyActive,
-                    'onlyConnectedSynapses': True,
+                    'onlyConnectedSynapses': onlyConnected,
                 },
             })
 
