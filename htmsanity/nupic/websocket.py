@@ -1,3 +1,4 @@
+from collections import deque
 import numpy
 from autobahn.twisted.websocket import WebSocketServerProtocol
 from transit.writer import Writer
@@ -25,6 +26,7 @@ class NumpyArrayHandler(ArrayHandler):
 def toTransitStr(v):
     io = StringIO()
     writer = Writer(io, "json")
+    writer.register(deque, ArrayHandler)
     writer.register(numpy.uint32, NumpyIntHandler)
     writer.register(numpy.float32, NumpyFloatHandler)
     writer.register(numpy.ndarray, NumpyArrayHandler)

@@ -114,11 +114,15 @@ class UnionPoolingExperimentSanityModel(SanityModel):
                 onlySources = prevState['regions']['tm']['layer']['activeCells']
                 sourcePath = ('regions', 'tm', 'layer')
                 sourceCellsPerColumn = tm.cellsPerColumn
+                onlyActiveSynapses = distalSegmentsQuery['onlyActiveSynapses']
+                onlyConnectedSynapses = distalSegmentsQuery['onlyConnectedSynapses']
                 distalSegments = segmentsFromConnections(tm.connections, tm,
                                                          columnsToCheck,
                                                          onlySources,
                                                          sourcePath,
-                                                         sourceCellsPerColumn)
+                                                         sourceCellsPerColumn,
+                                                         onlyActiveSynapses,
+                                                         onlyConnectedSynapses)
                 regions['tm']['layer'].update({
                     'distalSegments': distalSegments,
                     "nDistalLearningThreshold": tm.minThreshold,

@@ -1,3 +1,5 @@
+from collections import deque
+
 from transit.transit_types import Keyword
 
 def makeStep(sanityModel, modelId):
@@ -103,16 +105,24 @@ class Journal(object):
             })
 
         if self.captureOptions[Keyword("distal-synapses")][Keyword("capture?")]:
+            onlyActive = self.captureOptions[Keyword('distal-synapses')][Keyword('only-active?')]
             queryArgs.update({
                 'getDistalSegments': True,
+                'distalSegmentsQuery': {
+                    'onlyActiveSynapses': onlyActive,
+                    'onlyConnectedSynapses': True,
+                },
             })
 
         if self.captureOptions[Keyword("apical-synapses")][Keyword("capture?")]:
+            onlyActive = self.captureOptions[Keyword('apical-synapses')][Keyword('only-active?')]
             queryArgs.update({
                 'getApicalSegments': True,
+                'apicalSegmentsQuery': {
+                    'onlyActiveSynapses': onlyActive,
+                    'onlyConnectedSynapses': True,
+                },
             })
-
-        # TODO: grab the specified synapse types
 
         self.journal.append(sanityModel.query(**queryArgs))
 
@@ -300,22 +310,29 @@ class Journal(object):
 
                 # TODO only send synapses according to viz-options
                 # e.g. only for selected segment
-                activeSynapses = []
-                for sourcePath, synapses in segment["synapses"].items():
+
+                # This code would be a lot smaller without all the translation
+                # to Keywords.
+                retSynsByState = {}
+                for sourcePath, synapsesByState in segment["synapses"].items():
                     synapseTemplate = {}
                     if sourcePath:
                         synapseTemplate[Keyword('src-id')] = Keyword(sourcePath[1])
                         if sourcePath[0] == 'regions':
                             synapseTemplate[Keyword('src-lyr')] = Keyword(sourcePath[2])
 
-                    for targetCol, targetCell, perm in synapses:
-                        syn = synapseTemplate.copy()
-                        syn.update({
-                            Keyword("src-col"): targetCol,
-                            Keyword("perm"): perm,
-                            Keyword("src-dt"): 1, # TODO don't assume this
-                        })
-                        activeSynapses.append(syn)
+                    for state, synapses in synapsesByState.items():
+                        syns = deque()
+                        for targetCol, targetCell, perm in synapses:
+                            syn = synapseTemplate.copy()
+                            syn.update({
+                                Keyword("src-col"): targetCol,
+                                Keyword("perm"): perm,
+                                Keyword("src-dt"): 1, # TODO don't assume this
+                            })
+                            syns.append(syn)
+                        retSynsByState[Keyword(state)] = syns
+
 
                 nConnectedActive = segment["nConnectedActive"]
                 if nConnectedActive > connectedActiveMax:
@@ -330,9 +347,7 @@ class Journal(object):
                     Keyword("n-disc-tot"): segment["nDisconnectedTotal"],
                     Keyword("stimulus-th"): layerData[nStimulusThresholdKey],
                     Keyword("learning-th"): layerData[nLearningThresholdKey],
-                    Keyword("syns-by-state"): {
-                        Keyword("active"): activeSynapses,
-                    },
+                    Keyword("syns-by-state"): retSynsByState,
                 }
                 segs[segIdx] = segData
 

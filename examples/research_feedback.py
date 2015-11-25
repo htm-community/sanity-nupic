@@ -267,10 +267,14 @@ class FeedbackExperimentSanityModel(SanityModel):
                 if getDistalSegments:
                     onlySources = prevState['regions']['tm']['layer']['activeCells']
                     sourcePath = ('regions', 'tm', 'layer')
+                    onlyActiveSynapses = distalSegmentsQuery['onlyActiveSynapses']
+                    onlyConnectedSynapses = distalSegmentsQuery['onlyConnectedSynapses']
                     distalSegments = segmentsFromConnections(tm.connections, tm,
                                                              columnsToCheck, onlySources,
                                                              sourcePath,
-                                                             tm.cellsPerColumn)
+                                                             tm.cellsPerColumn,
+                                                             onlyActiveSynapses,
+                                                             onlyConnectedSynapses)
                     regions['tm']['layer'].update({
                         'distalSegments': distalSegments,
                         "nDistalLearningThreshold": tm.minThreshold,
@@ -281,10 +285,14 @@ class FeedbackExperimentSanityModel(SanityModel):
                     sourcePath = ('regions', 'pseudo', 'layer')
                     sourceCellsPerColumn = 1
                     sourceCellOffset = -tm.numberOfCells()
+                    onlyActiveSynapses = apicalSegmentsQuery['onlyActiveSynapses']
+                    onlyConnectedSynapses = apicalSegmentsQuery['onlyConnectedSynapses']
                     apicalSegments = segmentsFromConnections(tm.apicalConnections, tm,
                                                              columnsToCheck, onlySources,
                                                              sourcePath,
                                                              sourceCellsPerColumn,
+                                                             onlyActiveSynapses,
+                                                             onlyConnectedSynapses,
                                                              sourceCellOffset)
                     regions['tm']['layer'].update({
                         'apicalSegments': apicalSegments,
