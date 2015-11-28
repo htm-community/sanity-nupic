@@ -1,13 +1,9 @@
 import uuid
 
-##
-## For message senders / receivers
-##
+from transit.transit_types import Keyword
 
-class ChannelMarshal(object):
-  def __init__(self, ch, useOnce):
-    self.ch = ch
-    self.useOnce = useOnce
+class Releasable(object):
+  def __init__(self):
     self.isReleased = False
 
     self._lastEventIds = {
@@ -18,7 +14,7 @@ class ChannelMarshal(object):
     }
 
   def addEventListener(self, event, fn):
-    eventId = self.lastEventIds[event] + 1
+    eventId = self._lastEventIds[event] + 1
     self._listeners[event][eventId] = fn
     self._lastEventIds[event] = eventId
 
@@ -30,6 +26,17 @@ class ChannelMarshal(object):
     self.isReleased = True
     for fn in self._listeners['didRelease'].values():
       fn()
+
+
+##
+## For message senders / receivers
+##
+
+class ChannelMarshal(Releasable):
+  def __init__(self, ch, useOnce):
+    super(ChannelMarshal, self).__init__()
+    self.ch = ch
+    self.useOnce = useOnce
 
 def channel(ch, useOnce=False):
   """Returns a ChannelMarshal. It can then carry a channel across the network.
@@ -69,6 +76,31 @@ def channelWeak(targetId):
 
   """
   return ChannelWeakMarshal(targetId)
+
+class BigValueMarshal(Releasable):
+  def __init__(self, resourceId, value):
+    super(BigValueMarshal, self).__init__()
+    self.resourceId = resourceId
+    self.value = value
+
+def bigValue(value):
+  """Returns a BigValueMarshal. It puts this value in a box labeled 'recipients
+  should cache this so that I don't have to send it every time.'
+
+  When Client B decodes a message containing a BigValueMarshal, it will save the
+  value and tell Client A that it has saved the value. Later, when Client A
+  serializes the same BigValueMarshal to send it to Client B, it will only
+  include the resourceId, and Client B will reinsert the value when it decodes
+  the message.
+
+  Call `release` on a BigValueMarshal to tell other machines that they can
+  release it.
+
+  All of this assumes that the network code on both clients is using
+  write-handlers and read-handlers that follow this protocol.
+
+  """
+  return BigValueMarshal(uuid.uuid1(), value)
 
 ##
 ## For networking
@@ -128,14 +160,110 @@ class ChannelWeakMarshalWriteHandler(object):
   def rep(channelWeakMarshal):
     return channelWeakMarshal.targetId
 
+class OnRemoteResourceReleased(object):
+  def __init__(self, remoteResources, resourceId):
+    self.remoteResources = remoteResources
+    self.resourceId = resourceId
+
+  def put(self, msg):
+    del self.remoteResources[self.resourceId]
+
+class BigValueMarshalReadHandler(object):
+  def __init__(self, remoteResources):
+    self.remoteResources = remoteResources
+
+  def from_rep(self, m):
+    resourceId = m[Keyword('resource-id')]
+    onSavedChannelMarshal = m.get(Keyword('on-saved-c-marshal'), None)
+    isNew = resourceId not in self.remoteResources
+    if isNew:
+      self.remoteResources[resourceId] = BigValueMarshal(resourceId, m[Keyword('value')])
+
+    if onSavedChannelMarshal is not None:
+      # Depending on timing, this may happen multiple times for a single resource.
+      # The other machine wants to free up this channel, so always respond.
+      # But only give it an onReleased channel once.
+      onReleaseChannelMarshal = None
+      if isNew:
+        onRelease = OnRemoteResourceReleased(self.remoteResources, resourceId)
+        onReleaseChannelMarshal = channel(onRelease)
+      msg = [Keyword('saved'), onReleaseChannelMarshal]
+      onSavedChannelMarshal.ch.put(msg)
+
+    return self.remoteResources[resourceId]
+
+class OnLocalResourceReleased(object):
+  def __init__(self, localResources, resourceId):
+    self.localResources = localResources
+    self.resourceId = resourceId
+
+  def put(self, _):
+    entry = self.localResources[self.resourceId]
+    del self.localResources[self.resourceId]
+
+    ch = entry['onReleasedChannel']
+    if ch is not None:
+      ch.put(('released'))
+
+class OnResourceSavedRemotely(object):
+  def __init__(self, localResources, resourceId):
+    self.localResources = localResources
+    self.resourceId = resourceId
+
+  def put(self, msg):
+    cmd, onReleasedChannelMarshal = msg
+    entry = self.localResources[self.resourceId]
+    entry['isPushed'] = True
+    if onReleasedChannelMarshal is not None:
+      entry['onReleasedChannel'] = onReleasedChannelMarshal.ch
+
+class BigValueMarshalWriteHandler(object):
+  def __init__(self, localResources):
+    self.localResources = localResources
+
+  @staticmethod
+  def tag(bigValueMarshal):
+    return 'BigValueMarshal'
+
+  def rep(self, bigValueMarshal):
+    resourceId = bigValueMarshal.resourceId
+
+    if resourceId in self.localResources:
+      entry = self.localResources[resourceId]
+    else:
+      entry = {
+        'marshal': bigValueMarshal,
+        'isPushed': False,
+        'onReleasedChannel': None,
+      }
+      if not bigValueMarshal.isReleased:
+        self.localResources[resourceId] = entry
+        onRelease = OnLocalResourceReleased(self.localResources, resourceId)
+        bigValueMarshal.addEventListener('didRelease',
+                                         lambda: onRelease.put('release'))
+
+    if entry['isPushed']:
+      return {
+        Keyword('resource-id'): resourceId,
+      }
+    else:
+      onRemotelySaved = OnResourceSavedRemotely(self.localResources, resourceId)
+      return {
+        Keyword('resource-id'): resourceId,
+        Keyword('value'): bigValueMarshal.value,
+        Keyword('on-saved-c-marshal'): channel(onRemotelySaved),
+      }
+
 def getReadHandlers(localTargets, fput, fclose, remoteResources):
   return {
     'ChannelMarshal': ChannelMarshalReadHandler(fput, fclose),
     'ChannelWeakMarshal': ChannelWeakMarshalReadHandler(localTargets),
+    'BigValueMarshal': BigValueMarshalReadHandler(remoteResources),
   }
 
 def getWriteHandlers(localTargets, localResources):
   return {
     ChannelMarshal: ChannelMarshalWriteHandler(localTargets),
     ChannelWeakMarshal: ChannelWeakMarshalWriteHandler,
+    BigValueMarshal: BigValueMarshalWriteHandler(localResources),
   }

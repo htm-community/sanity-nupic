@@ -27,10 +27,10 @@ class NumpyArrayHandler(ArrayHandler):
 
 # twisted wants a class, not an object. We need to give the object
 # parameters of our own. So we use a closure.
-def makeSanityWebSocketClass(localTargets):
+def makeSanityWebSocketClass(localTargets, localResources, remoteResources):
     class SanityWebSocket(WebSocketServerProtocol):
         def sanitySend(self, message):
-            writeHandlers = marshal.getWriteHandlers(localTargets, {})
+            writeHandlers = marshal.getWriteHandlers(localTargets, localResources)
             writeHandlers.update({
                 deque: ArrayHandler,
                 numpy.uint32: NumpyIntHandler,
@@ -60,7 +60,7 @@ def makeSanityWebSocketClass(localTargets):
                     localTargets,
                     lambda targetId, v: self.sanitySend((targetId, Keyword('put!'), v)),
                     lambda targetId: self.sanitySend((targetId, Keyword('close!'))),
-                    {}
+                    remoteResources
                 )
                 reader = Reader("json")
                 for tag, handler in readHandlers.items():
@@ -70,11 +70,14 @@ def makeSanityWebSocketClass(localTargets):
                 cmdStr = str(cmd)
                 if cmdStr == 'put!' or cmdStr == 'close!':
                     if targetId in localTargets:
-                        ch = localTargets[targetId].ch
+                        channelMarshal = localTargets[targetId]
                         if cmdStr == 'put!':
-                            ch.put(val)
+                            channelMarshal.ch.put(val)
                         elif cmdStr == 'close!':
-                            ch.close()
+                            channelMarshal.ch.close()
+
+                        if channelMarshal.useOnce:
+                            channelMarshal.ch.release()
                     else:
                         print "Unrecognized target! " + target
                 else:

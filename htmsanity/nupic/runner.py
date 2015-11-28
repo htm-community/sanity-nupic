@@ -27,7 +27,7 @@ class SanityRunner(object):
 
     def start(self, port=24601, useBackgroundThread=False):
         factory = WebSocketServerFactory("ws://127.0.0.1:{0}".format(port), debug=False)
-        factory.protocol = makeSanityWebSocketClass(self.localTargets)
+        factory.protocol = makeSanityWebSocketClass(self.localTargets, {}, {})
         log.startLogging(sys.stdout)
         reactor.listenTCP(port, factory)
 
