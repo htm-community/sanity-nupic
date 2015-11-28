@@ -38,6 +38,10 @@ class Journal(object):
         self.append(sanityModel)
         sanityModel.addEventListener('didStep', lambda: self.append(sanityModel))
 
+    # Act like a channel.
+    def put(self, v):
+        self.handleMessage(v)
+
     def absorbStepTemplate(self, sanityModel):
         self.stepTemplate = sanityModel.query(self.getBitHistory, getNetworkLayout=True)
         senses = {}
@@ -147,13 +151,13 @@ class Journal(object):
         elif command == "ping":
             pass
         elif command == "subscribe":
-            stepsChannel, responseChannel = args
+            stepsChannelMarshal, responseChannelMarshal = args
 
-            self.subscribers.append(stepsChannel)
+            self.subscribers.append(stepsChannelMarshal.ch)
 
-            responseChannel.put([self.stepTemplateEncoded, self.captureOptions])
+            responseChannelMarshal.ch.put([self.stepTemplateEncoded, self.captureOptions])
         elif command == "get-cells-segments":
-            modelId, rgnId, lyrId, col, ci_si, token, responseChannel = args
+            modelId, rgnId, lyrId, col, ci_si, token, responseChannelMarshal = args
 
             modelData = self.journal[modelId]
             layerData = modelData['regions'][str(rgnId)][str(lyrId)]
@@ -180,13 +184,13 @@ class Journal(object):
                                                    "nApicalStimulusThreshold",
                                                    "nApicalLearningThreshold")
 
-            responseChannel.put({
+            responseChannelMarshal.ch.put({
                 Keyword('distal'): distal,
                 Keyword('apical'): apical,
             })
 
         elif command == "get-ff-in-synapses":
-            modelId, rgnId, lyrId, onlyColumns, doTraceBack, token, responseChannel = args
+            modelId, rgnId, lyrId, onlyColumns, doTraceBack, token, responseChannelMarshal = args
             modelData = self.journal[modelId]
             layerData = modelData["regions"][str(rgnId)][str(lyrId)]
             proximalSynapses = layerData.get('proximalSynapses', {})
@@ -220,10 +224,10 @@ class Journal(object):
             ret = {}
             for column, synapses in synapsesByColumn.items():
                 ret[(rgnId, lyrId, column)] = synapses
-                responseChannel.put(ret)
+                responseChannelMarshal.ch.put(ret)
 
         elif command == "get-inbits-cols":
-            modelId, token, responseChannel = args
+            modelId, token, responseChannelMarshal = args
             modelData = self.journal[modelId]
 
             response = {
@@ -249,17 +253,13 @@ class Journal(object):
                         Keyword("pred-columns"): prevPredColumns
                     }
 
-            responseChannel.put(response)
+            responseChannelMarshal.ch.put(response)
 
         elif command == "set-capture-options":
             captureOptions, = args
             self.captureOptions = captureOptions
-        elif command == "register-viewport":
-            viewport, responseChannel = args
-            # Not actually used yet, but the client needs a token.
-            responseChannel.put("this is your token")
-        # else:
-        #     print "Unrecognized command! %s" % command
+        else:
+            print "Unrecognized command! %s" % command
 
     def getCellsSegmentsResponse(self, modelId, rgnId,
                                  lyrId, col, ci_si, layerData, segments,

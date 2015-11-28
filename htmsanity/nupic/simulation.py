@@ -43,8 +43,13 @@ class Simulation(object):
             if not self.isGoing:
                 self.sanityModel.doStep()
         elif command == "subscribe-to-status":
-            subscriberChannel, = args
+            subscriberChannelMarshal, = args
+            subscriberChannel = subscriberChannelMarshal.ch
             self.statusSubscribers.append(subscriberChannel)
             subscriberChannel.put([self.isGoing])
-        # else:
-        #     print "Unrecognized command! %s" % command
+        else:
+            print "Unrecognized command! %s" % command
+
+    # Act like a channel.
+    def put(self, v):
+        self.handleMessage(v)

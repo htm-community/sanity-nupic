@@ -6,22 +6,28 @@ from transit.transit_types import Keyword
 from twisted.internet import reactor
 from twisted.python import log
 
+import marshalling as marshal
 from simulation import Simulation
 from journal import Journal
-from websocket import makeVizWebSocketClass
+from websocket import makeSanityWebSocketClass
+
+class Channel(object):
+    def __init__(self, fput, fclose):
+        self.put = fput
+        self.close = fclose
 
 class SanityRunner(object):
     def __init__(self, sanityModel):
         journal = Journal(sanityModel)
         simulation = Simulation(sanityModel)
         self.localTargets = {
-            Keyword("into-sim"): lambda x: simulation.handleMessage(x),
-            Keyword("into-journal"): lambda x: journal.handleMessage(x),
+            Keyword("into-sim"): marshal.channel(simulation),
+            Keyword("into-journal"): marshal.channel(journal),
         }
 
     def start(self, port=24601, useBackgroundThread=False):
         factory = WebSocketServerFactory("ws://127.0.0.1:{0}".format(port), debug=False)
-        factory.protocol = makeVizWebSocketClass(self.localTargets)
+        factory.protocol = makeSanityWebSocketClass(self.localTargets)
         log.startLogging(sys.stdout)
         reactor.listenTCP(port, factory)
 
