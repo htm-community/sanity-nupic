@@ -201,6 +201,35 @@ class Journal(object):
                 }
             responseChannelMarshal.ch.put(segmentsByCell)
 
+        elif command == 'get-column-state-freqs':
+            modelId, responseChannelMarshal = args
+            modelData = self.journal[modelId]
+
+            ret = {}
+            for rgnId, regionData in modelData["regions"].items():
+                for lyrId, layerData in regionData.items():
+                    layerDims = self.stepTemplate['regions'][rgnId][lyrId]['dimensions']
+                    size = reduce(lambda x, y: x * y, layerDims, 1)
+
+                    activeColumns = layerData["activeColumns"]
+                    if modelId > 0:
+                        prevModelData = self.journal[modelId - 1]
+                        prevLayerData = prevModelData['regions'][rgnId][lyrId]
+                        prevPredColumns = prevLayerData['predictedColumns']
+                    else:
+                        prevPredColumns = set()
+
+                    path = (Keyword(rgnId), Keyword(lyrId))
+                    ret[path] = {
+                        Keyword('active'): len(activeColumns - prevPredColumns),
+                        Keyword('predicted'): len(prevPredColumns - activeColumns),
+                        Keyword('active-predicted'): len(activeColumns & prevPredColumns),
+                        Keyword('timestep'): modelId,
+                        Keyword('size'): size,
+                    }
+
+            responseChannelMarshal.ch.put(ret)
+
         elif command == 'get-apical-segment-synapses':
             modelId, rgnId, lyrId, col, cellIndex, segIndex, synStates, responseChannelMarshal = args
             modelData = self.journal[modelId]
