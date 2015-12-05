@@ -2,6 +2,12 @@
 
 A [NuPIC](https://github.com/numenta/nupic) backend for [Sanity](https://github.com/nupic-community/sanity).
 
+Videos:
+
+- [See your HTM run](https://www.youtube.com/watch?v=rEQ2XVOnhDw)
+  - [With Q&A](https://www.youtube.com/watch?v=OHSuydq2OW4)
+- [See your HTM run: Duct tape is okay!](https://www.youtube.com/watch?v=bqu-hc4pc7Q)
+
 ## Install
 
 Install NuPIC. [Instructions](https://github.com/numenta/nupic)
