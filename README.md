@@ -34,7 +34,7 @@ lein cljsbuild once demos
 cd ..
 ~~~
 
-If you can't handle the JVM and [Leiningen](http://leiningen.org/), you can download and host [this folder](http://mrcslws.com/stuff/sanity-client.82c576e.zip).
+If you can't handle the JVM and [Leiningen](http://leiningen.org/), you can download and host [this folder](http://mrcslws.com/stuff/sanity-client.bd048dc.zip).
 
 ## Run
 
