@@ -98,7 +98,7 @@ class UnionPoolingExperimentSanityModel(SanityModel):
                                                 regions['tm']['layer']['activeCells'],
                                                 proximalSynapsesQuery['onlyActiveSynapses'],
                                                 proximalSynapsesQuery['onlyConnectedSynapses'],
-                                                targetDepth=tm.cellsPerColumn)
+                                                sourceDepth=tm.cellsPerColumn)
             regions['up']['layer'].update({
                 'proximalSynapses': {
                     ('regions', 'tm', 'layer'): upSynapses,

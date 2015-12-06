@@ -2,12 +2,6 @@ from collections import deque
 
 from transit.transit_types import Keyword
 
-def makeStep(sanityModel, modelId):
-    return {
-        Keyword("model-id"): modelId,
-        Keyword("timestep"): sanityModel.timestep,
-    }
-
 class Journal(object):
     def __init__(self, sanityModel):
         self.journal = []
@@ -131,12 +125,38 @@ class Journal(object):
                 },
             })
 
-        self.journal.append(sanityModel.query(**queryArgs))
+        modelData = sanityModel.query(**queryArgs)
+        self.journal.append(modelData)
 
         # TODO: only keep nKeepSteps models
 
-        step = makeStep(sanityModel, self.nextModelId)
+        modelId = self.nextModelId
         self.nextModelId += 1
+
+        step = {
+            Keyword("model-id"): modelId,
+            Keyword("timestep"): sanityModel.timestep,
+            Keyword("senses"): {},
+            Keyword("regions"): {},
+        }
+
+        for senseName, senseData in modelData["senses"].items():
+            step[Keyword("senses")][Keyword(senseName)] = {
+                Keyword("active-bits"): senseData["activeBits"],
+            }
+
+        for regionName, regionData in modelData["regions"].items():
+            step[Keyword("regions")][Keyword(regionName)] = {}
+            for layerName, layerData in regionData.items():
+                prevPredColumns = None
+                if modelId > 0:
+                    prevModelData = self.journal[modelId - 1]
+                    prevLayerData = prevModelData['regions'][regionName][layerName]
+                    prevPredColumns = prevLayerData['predictedColumns']
+                step[Keyword("regions")][Keyword(regionName)][Keyword(layerName)] = {
+                    Keyword("active-columns"): layerData["activeColumns"],
+                    Keyword("pred-columns"): prevPredColumns
+                }
 
         step[Keyword("display-value")] = sanityModel.getInputDisplayText()
 
@@ -201,6 +221,16 @@ class Journal(object):
                 }
             responseChannelMarshal.ch.put(segmentsByCell)
 
+        elif command == 'get-column-proximal-segments':
+            modelId, rgnId, lyrId, col, responseChannelMarshal = args
+            # Only one proximal segment per column.  And nobody is checking
+            # nConnectedActive, etc., for proximal segments, so don't grab it.
+            cell = -1
+            segIndex = 0
+            seg = {}
+            response = {cell: {segIndex: seg}}
+            responseChannelMarshal.ch.put(response)
+
         elif command == 'get-column-state-freqs':
             modelId, responseChannelMarshal = args
             modelData = self.journal[modelId]
@@ -248,6 +278,39 @@ class Journal(object):
                                                        segIndex, synStates)
             responseChannelMarshal.ch.put(response)
 
+        elif command == 'get-proximal-segment-synapses':
+            modelId, rgnId, lyrId, col, cellIndex, segIndex, synStates, responseChannelMarshal = args
+            assert cellIndex is -1
+            assert segIndex is 0
+            modelData = self.journal[modelId]
+            layerData = modelData['regions'][str(rgnId)][str(lyrId)]
+            proximalSynapses = layerData.get('proximalSynapses', {})
+            synsByState = {}
+            for sourcePath, synapsesByState in proximalSynapses.items():
+                for state, synapses in synapsesByState.items():
+                    if Keyword(state) in synStates:
+                        syns = deque()
+                        synapseTemplate = {
+                            Keyword('src-id'): Keyword(sourcePath[1]),
+                            Keyword('syn-state'): Keyword(state),
+                        }
+                        if sourcePath[0] == 'regions':
+                            synapseTemplate[Keyword('src-lyr')] = Keyword(sourcePath[2])
+
+                        for column, sourceColumn, perm in synapses:
+                            if column == col:
+                                syn = synapseTemplate.copy()
+                                syn.update({
+                                    Keyword("src-col"): sourceColumn,
+                                    Keyword("perm"): perm,
+                                    Keyword("src-dt"): 0, # TODO don't assume this
+                                })
+                                syns.append(syn)
+
+                        synsByState[Keyword(state)] = syns
+
+            responseChannelMarshal.ch.put(synsByState)
+
         elif command == "get-column-cells":
             modelId, rgnId, lyrId, col, responseChannelMarshal = args
             modelData = self.journal[modelId]
@@ -273,69 +336,12 @@ class Journal(object):
                 Keyword('prior-predicted-cells'): predictedCellsInCol,
             })
 
-        elif command == "get-ff-in-synapses":
-            modelId, rgnId, lyrId, onlyColumns, doTraceBack, token, responseChannelMarshal = args
-            modelData = self.journal[modelId]
-            layerData = modelData["regions"][str(rgnId)][str(lyrId)]
-            proximalSynapses = layerData.get('proximalSynapses', {})
-            synapsesByColumn = {}
-            for sourcePath, synapsesByState in proximalSynapses.items():
-                for state, synapses in synapsesByState.items():
-                    synapseTemplate = {
-                        Keyword('src-id'): Keyword(sourcePath[1]),
-                        Keyword('syn-state'): Keyword(state),
-                    }
-                    activeBits = []
-                    if sourcePath[0] == 'senses':
-                        senseData = modelData['senses'][sourcePath[1]]
-                        activeBits = senseData['activeBits']
-                    elif sourcePath[0] == 'regions':
-                        synapseTemplate[Keyword('src-lyr')] = Keyword(sourcePath[2])
-
-                    for column, sourceColumn, perm in synapses:
-                        if column in onlyColumns:
-                            if column not in synapsesByColumn:
-                                synapsesByColumn[column] = []
-
-                            syn = synapseTemplate.copy()
-                            syn.update({
-                                Keyword("src-col"): sourceColumn,
-                                Keyword("perm"): perm,
-                                Keyword("src-dt"): 0, # TODO don't assume this
-                            })
-                            synapsesByColumn[column].append(syn)
-
-            ret = {}
-            for column, synapses in synapsesByColumn.items():
-                ret[(rgnId, lyrId, column)] = synapses
-                responseChannelMarshal.ch.put(ret)
-
         elif command == "get-inbits-cols":
             modelId, token, responseChannelMarshal = args
             modelData = self.journal[modelId]
 
-            response = {
-                Keyword("senses"): {},
-                Keyword("regions"): {},
-            }
-
-            for senseName, senseData in modelData["senses"].items():
-                response[Keyword("senses")][Keyword(senseName)] = {
-                    Keyword("active-bits"): senseData["activeBits"],
-                }
-
-            for regionName, regionData in modelData["regions"].items():
-                response[Keyword("regions")][Keyword(regionName)] = {}
-                for layerName, layerData in regionData.items():
-                    prevPredColumns = None
-                    if modelId > 0:
-                        prevModelData = self.journal[modelId - 1]
-                        prevLayerData = prevModelData['regions'][regionName][layerName]
-                        prevPredColumns = prevLayerData['predictedColumns']
-                    response[Keyword("regions")][Keyword(regionName)][Keyword(layerName)] = {
-                        Keyword("active-columns"): layerData["activeColumns"],
-                        Keyword("pred-columns"): prevPredColumns
-                    }
+            # No extended functionality for NuPIC yet.
+            response = {}
 
             responseChannelMarshal.ch.put(response)
 

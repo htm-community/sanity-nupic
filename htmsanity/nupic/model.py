@@ -219,7 +219,7 @@ class SanityModel(object):
         """
 
 def proximalSynapsesFromSP(sp, activeBits, onlyActiveSynapses,
-                           onlyConnectedSynapses, targetDepth=1):
+                           onlyConnectedSynapses, sourceDepth=1):
     activeSyns = deque()
     inactiveSyns = deque()
     disconnectedSyns = deque()
@@ -237,15 +237,15 @@ def proximalSynapsesFromSP(sp, activeBits, onlyActiveSynapses,
 
         activeConnectedMask = activeMask & potentialMask & connectedMask
         for inputBit in activeConnectedMask.nonzero()[0]:
-            targetColumn = int(inputBit / targetDepth)
-            syn = (column, targetColumn, synapsePermanences[inputBit])
+            sourceColumn = int(inputBit / sourceDepth)
+            syn = (column, sourceColumn, synapsePermanences[inputBit])
             activeSyns.append(syn)
 
         if not onlyActiveSynapses:
             inactiveConnectedMask = ~activeMask & potentialMask & connectedMask
             for inputBit in inactiveConnectedMask.nonzero()[0]:
-                targetColumn = int(inputBit / targetDepth)
-                syn = (column, targetColumn, synapsePermanences[inputBit])
+                sourceColumn = int(inputBit / sourceDepth)
+                syn = (column, sourceColumn, synapsePermanences[inputBit])
                 inactiveSyns.append(syn)
 
         if not onlyConnectedSynapses:
@@ -253,8 +253,8 @@ def proximalSynapsesFromSP(sp, activeBits, onlyActiveSynapses,
             if onlyActiveSynapses:
                 disconnectedMask = disconnectedMask & activeMask
             for inputBit in disconnectedMask.nonzero()[0]:
-                targetColumn = int(inputBit / targetDepth)
-                syn = (column, targetColumn, synapsePermanences[inputBit])
+                sourceColumn = int(inputBit / sourceDepth)
+                syn = (column, sourceColumn, synapsePermanences[inputBit])
                 disconnectedSyns.append(syn)
 
     return {
