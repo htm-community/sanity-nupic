@@ -26,7 +26,7 @@ class Simulation(object):
             subscriber.put([self.isGoing])
 
     def handleMessage(self, msg):
-        command = str(msg[0])
+        command = msg[0]
         args = msg[1:]
         if command == "connect":
             pass

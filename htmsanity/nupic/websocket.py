@@ -3,7 +3,6 @@ import numpy
 from autobahn.twisted.websocket import WebSocketServerProtocol
 from transit.writer import Writer
 from transit.reader import Reader
-from transit.transit_types import Keyword
 from transit.write_handlers import IntHandler, FloatHandler, ArrayHandler
 from StringIO import StringIO
 from twisted.internet import reactor
@@ -25,6 +24,8 @@ class NumpyArrayHandler(ArrayHandler):
     def rep(a):
         return a.tolist()
 
+TRANSIT_ENCODING = "json_verbose"
+
 # twisted wants a class, not an object. We need to give the object
 # parameters of our own. So we use a closure.
 def makeSanityWebSocketClass(localTargets, localResources, remoteResources):
@@ -38,7 +39,7 @@ def makeSanityWebSocketClass(localTargets, localResources, remoteResources):
                 numpy.ndarray: NumpyArrayHandler,
             })
             io = StringIO()
-            writer = Writer(io, "json")
+            writer = Writer(io, TRANSIT_ENCODING)
             for objType, handler in writeHandlers.items():
                 writer.register(objType, handler)
             writer.write(message)
@@ -58,22 +59,21 @@ def makeSanityWebSocketClass(localTargets, localResources, remoteResources):
             else:
                 readHandlers = marshal.getReadHandlers(
                     localTargets,
-                    lambda targetId, v: self.sanitySend((targetId, Keyword('put!'), v)),
-                    lambda targetId: self.sanitySend((targetId, Keyword('close!'))),
+                    lambda targetId, v: self.sanitySend(('put!', targetId, v)),
+                    lambda targetId: self.sanitySend(('close!', targetId)),
                     remoteResources
                 )
-                reader = Reader("json")
+                reader = Reader(TRANSIT_ENCODING)
                 for tag, handler in readHandlers.items():
                     reader.register(tag, handler)
                 msg = reader.read(StringIO(payload))
-                targetId, cmd, val = msg
-                cmdStr = str(cmd)
-                if cmdStr == 'put!' or cmdStr == 'close!':
+                cmd, targetId, val = msg
+                if cmd == 'put!' or cmd == 'close!':
                     if targetId in localTargets:
                         channelMarshal = localTargets[targetId]
-                        if cmdStr == 'put!':
+                        if cmd == 'put!':
                             channelMarshal.ch.put(val)
-                        elif cmdStr == 'close!':
+                        elif cmd == 'close!':
                             channelMarshal.ch.close()
 
                         if channelMarshal.useOnce:

@@ -2,7 +2,6 @@ import sys
 import threading
 
 from autobahn.twisted.websocket import WebSocketServerFactory
-from transit.transit_types import Keyword
 from twisted.internet import reactor
 from twisted.python import log
 
@@ -21,8 +20,8 @@ class SanityRunner(object):
         journal = Journal(sanityModel)
         simulation = Simulation(sanityModel)
         self.localTargets = {
-            Keyword("into-sim"): marshal.channel(simulation),
-            Keyword("into-journal"): marshal.channel(journal),
+            'simulation': marshal.channel(simulation),
+            'journal': marshal.channel(journal),
         }
 
     def start(self, port=24601, useBackgroundThread=False):

@@ -1,7 +1,5 @@
 import uuid
 
-from transit.transit_types import Keyword
-
 class Releasable(object):
   def __init__(self):
     self.isReleased = False
@@ -173,11 +171,11 @@ class BigValueMarshalReadHandler(object):
     self.remoteResources = remoteResources
 
   def from_rep(self, m):
-    resourceId = m[Keyword('resource-id')]
-    onSavedChannelMarshal = m.get(Keyword('on-saved-c-marshal'), None)
+    resourceId = m['resource-id']
+    onSavedChannelMarshal = m.get('on-saved-c-marshal', None)
     isNew = resourceId not in self.remoteResources
     if isNew:
-      self.remoteResources[resourceId] = BigValueMarshal(resourceId, m[Keyword('value')])
+      self.remoteResources[resourceId] = BigValueMarshal(resourceId, m['value'])
 
     if onSavedChannelMarshal is not None:
       # Depending on timing, this may happen multiple times for a single resource.
@@ -187,7 +185,7 @@ class BigValueMarshalReadHandler(object):
       if isNew:
         onRelease = OnRemoteResourceReleased(self.remoteResources, resourceId)
         onReleaseChannelMarshal = channel(onRelease)
-      msg = [Keyword('saved'), onReleaseChannelMarshal]
+      msg = ['saved', onReleaseChannelMarshal]
       onSavedChannelMarshal.ch.put(msg)
 
     return self.remoteResources[resourceId]
@@ -244,14 +242,14 @@ class BigValueMarshalWriteHandler(object):
 
     if entry['isPushed']:
       return {
-        Keyword('resource-id'): resourceId,
+        'resource-id': resourceId,
       }
     else:
       onRemotelySaved = OnResourceSavedRemotely(self.localResources, resourceId)
       return {
-        Keyword('resource-id'): resourceId,
-        Keyword('value'): bigValueMarshal.value,
-        Keyword('on-saved-c-marshal'): channel(onRemotelySaved),
+        'resource-id': resourceId,
+        'value': bigValueMarshal.value,
+        'on-saved-c-marshal': channel(onRemotelySaved),
       }
 
 def getReadHandlers(localTargets, fput, fclose, remoteResources):
