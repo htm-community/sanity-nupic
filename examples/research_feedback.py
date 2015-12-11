@@ -359,7 +359,7 @@ def experiment2():
                                                 feedback_seq, test_sequence, testFeedback,
                                                 feedbackBuffer, feedback_n, alphabet)
     runner = SanityRunner(sanityModel)
-    runner.start(port=24601)
+    runner.start()
 
 if __name__ == "__main__":
     experiment2()

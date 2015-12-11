@@ -170,4 +170,4 @@ if __name__ == '__main__':
     # TODO: show higher-level sequence *and* current value in display text.
     sanityModel = UnionPoolingExperimentSanityModel(experiment, inputs, labels)
     runner = SanityRunner(sanityModel)
-    runner.start(port=24601)
+    runner.start()

@@ -25,7 +25,7 @@ Install the `sanity-nupic` python package;
 python setup.py develop --user
 ~~~
 
-Compile [Sanity](https://github.com/nupic-community/sanity) from ClojureScript to JavaScript.
+Compile [Sanity](https://github.com/nupic-community/sanity) from ClojureScript to JavaScript. You'll need Leiningen, which you can get through `brew install leiningen`, or just follow instructions on [the website](http://leiningen.org/).
 
 ~~~
 # Requires JVM
@@ -34,22 +34,13 @@ lein cljsbuild once demos
 cd ..
 ~~~
 
-If you can't handle the JVM and [Leiningen](http://leiningen.org/), you can download and host [this folder](http://mrcslws.com/stuff/sanity-client.d5f0b7f.zip).
+If you can't handle the JVM, you can download Sanity precompiled here
+[here](http://mrcslws.com/stuff/sanity-91337ed.zip). Copy the contents into
+`sanity/public/demos`. Sanity will load scripts from `sanity/public/demos/out`.
 
 ## Run
 
-There are two parts to this:
-
-1. Host Sanity client on a webserver.
-2. Run a NuPIC experiment.
-
-For part 1, you can just host the `sanity-nupic` folder. Make sure you've compiled Sanity.
-
-~~~
-python -m SimpleHTTPServer 8000
-~~~
-
-For part 2, here are some examples:
+Try an example!
 
 ~~~
 # Hello world
@@ -62,7 +53,7 @@ python examples/hotgym_plotted.py
 python examples/research_feedback.py
 ~~~
 
-Now navigate to `http://localhost:8000`
+Sanity will automatically open in a web browser.
 
 ## Use
 

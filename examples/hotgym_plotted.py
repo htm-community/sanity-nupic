@@ -144,5 +144,5 @@ if __name__ == '__main__':
     csvReader.next()
 
     runner = SanityRunner(HotGym(model, csvReader))
-    runner.start(port=24601, useBackgroundThread=True)
+    runner.start(useBackgroundThread=True)
     plt.show()
