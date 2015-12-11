@@ -29,14 +29,14 @@ Compile [Sanity](https://github.com/nupic-community/sanity) from ClojureScript t
 
 ~~~
 # Requires JVM
-cd sanity
+cd htmsanity/nupic/sanity
 lein cljsbuild once demos
 cd ..
 ~~~
 
 If you can't handle the JVM, you can download Sanity precompiled here
 [here](http://mrcslws.com/stuff/sanity-91337ed.zip). Copy the contents into
-`sanity/public/demos`. Sanity will load scripts from `sanity/public/demos/out`.
+`htmsanity/nupic/sanity/public/demos`. Sanity will load scripts from `demos/out`.
 
 ## Run
 

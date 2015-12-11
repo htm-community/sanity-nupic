@@ -1,4 +1,4 @@
 [submodule "sanity"]
-	path = sanity
+	path = htmsanity/nupic/sanity
 	url = https://github.com/nupic-community/sanity.git
 	branch = master

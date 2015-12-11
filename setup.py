@@ -22,5 +22,7 @@ setup(name="sanity-nupic",
       author_email="mrcslws@gmail.com",
       url="https://github.com/nupic-community/sanity-nupic/",
       packages=find_packages(),
+      package_data={'htmsanity': ['htmsanity/nupic/sanity/public/*',]},
       install_requires=findRequirements(),
+      zip_safe=False,
      )
