@@ -10,7 +10,15 @@ Videos:
 
 ## Install
 
-Install NuPIC. [Instructions](https://github.com/numenta/nupic)
+**The easy way:**
+
+~~~
+pip install sanity-nupic --user
+~~~
+
+Current version: `0.0.3`
+
+**The adventurous way:**
 
 Clone `sanity-nupic`, and fetch the submodules:
 
@@ -34,15 +42,14 @@ lein cljsbuild once demos
 cd ..
 ~~~
 
-If you can't handle the JVM, you can download Sanity precompiled here
-[here](http://mrcslws.com/stuff/sanity-91337ed.zip). Copy the contents into
-`htmsanity/nupic/sanity/public/demos`. Sanity will load scripts from `demos/out`.
-
 ## Run
 
 Try an example!
 
 ~~~
+git clone https://github.com/nupic-community/sanity-nupic.git
+cd sanity-nupic
+
 # Hello world
 python examples/hotgym.py
 
