@@ -314,15 +314,6 @@ class Journal(object):
 
             responseChannelMarshal.ch.put(ret)
 
-        elif command == 'get-inbits-cols':
-            modelId, fetches, cachedOnscreenBits, responseChannelMarshal = args
-            modelData = self.journal[modelId]
-
-            # No extended functionality for NuPIC yet.
-            response = {}
-
-            responseChannelMarshal.ch.put(response)
-
         elif command == 'set-capture-options':
             captureOptions, = args
             self.captureOptions = captureOptions

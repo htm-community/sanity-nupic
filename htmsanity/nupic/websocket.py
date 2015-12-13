@@ -24,7 +24,7 @@ class NumpyArrayHandler(ArrayHandler):
     def rep(a):
         return a.tolist()
 
-TRANSIT_ENCODING = "json_verbose"
+TRANSIT_ENCODING = "json"
 
 # twisted wants a class, not an object. We need to give the object
 # parameters of our own. So we use a closure.
