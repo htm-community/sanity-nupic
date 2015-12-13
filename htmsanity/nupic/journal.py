@@ -110,29 +110,8 @@ class Journal(object):
         step = {
             'model-id': modelId,
             'timestep': sanityModel.timestep,
-            'senses': {},
-            'regions': {},
+            'display-value': sanityModel.getInputDisplayText()
         }
-
-        for senseName, senseData in modelData['senses'].items():
-            step['senses'][senseName] = {
-                'active-bits': senseData['activeBits'],
-            }
-
-        for regionName, regionData in modelData['regions'].items():
-            step['regions'][regionName] = {}
-            for layerName, layerData in regionData.items():
-                prevPredColumns = None
-                if modelId > 0:
-                    prevModelData = self.journal[modelId - 1]
-                    prevLayerData = prevModelData['regions'][regionName][layerName]
-                    prevPredColumns = prevLayerData['predictedColumns']
-                step['regions'][regionName][layerName] = {
-                    'active-columns': layerData['activeColumns'],
-                    'pred-columns': prevPredColumns
-                }
-
-        step['display-value'] = sanityModel.getInputDisplayText()
 
         for subscriber in self.subscribers:
             subscriber.put(step)
@@ -309,6 +288,31 @@ class Journal(object):
                 'active-cells': activeCellsInCol,
                 'prior-predicted-cells': predictedCellsInCol,
             })
+
+        elif command == 'get-layer-bits':
+            modelId, rgnId, lyrId, fetches, cachedOnscreenBits, responseChannelMarshal = args
+
+            ret = {}
+            if 'active-columns' in fetches:
+                layerData = self.journal[modelId]['regions'][rgnId][lyrId]
+                ret['active-columns'] = layerData['activeColumns']
+
+            if 'pred-columns' in fetches:
+                if modelId > 0:
+                    prevLayerData = self.journal[modelId - 1]['regions'][rgnId][lyrId]
+                    ret['pred-columns'] = prevLayerData['predictedColumns']
+
+            responseChannelMarshal.ch.put(ret)
+
+        elif command == 'get-sense-bits':
+            modelId, senseId, fetches, cachedOnscreenBits, responseChannelMarshal = args
+            senseData = self.journal[modelId]['senses'][senseId]
+
+            ret = {}
+            if 'active-bits' in fetches:
+                ret['active-bits'] = senseData['activeBits']
+
+            responseChannelMarshal.ch.put(ret)
 
         elif command == 'get-inbits-cols':
             modelId, fetches, cachedOnscreenBits, responseChannelMarshal = args
