@@ -33,11 +33,14 @@ class SanityModel(object):
     def doStep(self):
         ret = self.step()
         if ret is not False:
-            self.timestep += 1
-            for fn in self.listeners['didStep'].values():
-                fn()
+            self.onStepped()
 
         return ret
+
+    def onStepped(self):
+        self.timestep += 1
+        for fn in self.listeners['didStep'].values():
+            fn()
 
     @abstractmethod
     def step(self):

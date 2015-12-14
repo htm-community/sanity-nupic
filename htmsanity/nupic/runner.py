@@ -1,9 +1,11 @@
 import os
 import SimpleHTTPServer
 import SocketServer
+import signal
 import sys
 import threading
 import webbrowser
+import collections
 
 from autobahn.twisted.websocket import WebSocketServerFactory
 from twisted.internet import reactor
@@ -12,6 +14,7 @@ from twisted.python import log
 import marshalling as marshal
 from simulation import Simulation
 from journal import Journal
+from model import CLASanityModel
 from websocket import makeSanityWebSocketClass
 
 PAGE = """
@@ -75,12 +78,12 @@ def makeRunnerRequestHandler(websocketPort):
     return RequestHandler
 
 class SanityRunner(object):
-    def __init__(self, sanityModel):
-        journal = Journal(sanityModel)
-        simulation = Simulation(sanityModel)
+    def __init__(self, sanityModel, startSimThread=True):
+        self.journal = Journal(sanityModel)
+        self.simulation = Simulation(sanityModel, startSimThread)
         self.localTargets = {
-            'simulation': marshal.channel(simulation),
-            'journal': marshal.channel(journal),
+            'simulation': marshal.channel(self.simulation),
+            'journal': marshal.channel(self.journal),
         }
 
     def start(self, launchBrowser=True, useBackgroundThread=False):
@@ -114,3 +117,46 @@ class SanityRunner(object):
             t.start()
         else:
             reactor.run()
+
+class CLASanityModelPatched(CLASanityModel):
+    def __init__(self, model):
+        super(CLASanityModelPatched, self).__init__(model)
+        self.lastInput = ""
+
+    def step(self):
+        assert False
+
+    def getInputDisplayText(self):
+        # Hard to solve this general problem. Sometimes the v contains
+        # unserializable datetimes.
+        ret = []
+        if isinstance(self.lastInput, collections.Mapping):
+            for k, v in self.lastInput.items():
+                ret.append((str(k), str(v)))
+
+        return ret
+
+def patchCLAModel(model):
+    sanityModel = CLASanityModelPatched(model)
+    runner = SanityRunner(sanityModel, startSimThread=False)
+    runner.start(useBackgroundThread=True)
+    simulation = runner.simulation
+    runMethod = model.run
+    def myRun(v):
+        while True:
+            if simulation.nStepsQueued > 0:
+                shouldGo = True
+            else:
+                shouldGo = simulation.isGoing
+
+            if shouldGo:
+                ret = runMethod(v)
+                sanityModel.lastInput = v
+                sanityModel.onStepped()
+                return ret
+            else:
+                # Having a timeout makes it receptive to ctrl+c...
+                simulation.checkStatusEvent.wait(999999)
+                simulation.checkStatusEvent.clear()
+
+    model.run = myRun

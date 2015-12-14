@@ -2,23 +2,32 @@ import threading
 
 def simulationThread(simulation, checkEvent):
     while True:
-        while simulation.isGoing:
+        if simulation.nStepsQueued > 0:
+            shouldGo = True
+            simulation.nStepsQueued -= 1
+        else:
+            shouldGo = simulation.isGoing
+
+        if shouldGo:
             ret = simulation.sanityModel.doStep()
             if ret is False:
                 return
-        checkEvent.wait()
-        checkEvent.clear()
+        else:
+            checkEvent.wait()
+            checkEvent.clear()
 
 class Simulation(object):
-    def __init__(self, sanityModel):
+    def __init__(self, sanityModel, startSimThread = True):
         self.sanityModel = sanityModel
         self.statusSubscribers = []
         self.isGoing = False
+        self.nStepsQueued = 0
         self.checkStatusEvent = threading.Event()
-        self.simThread = threading.Thread(target = simulationThread,
-                                          args = (self, self.checkStatusEvent))
-        self.simThread.daemon = True
-        self.simThread.start()
+        if startSimThread:
+            self.simThread = threading.Thread(target = simulationThread,
+                                              args = (self, self.checkStatusEvent))
+            self.simThread.daemon = True
+            self.simThread.start()
 
     def onStatusChanged(self):
         self.checkStatusEvent.set()
@@ -41,7 +50,8 @@ class Simulation(object):
             self.onStatusChanged()
         elif command == "step":
             if not self.isGoing:
-                self.sanityModel.doStep()
+                self.nStepsQueued += 1
+                self.checkStatusEvent.set()
         elif command == "subscribe-to-status":
             subscriberChannelMarshal, = args
             subscriberChannel = subscriberChannelMarshal.ch

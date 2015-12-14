@@ -39,12 +39,24 @@ Compile [Sanity](https://github.com/nupic-community/sanity) from ClojureScript t
 # Requires JVM
 cd htmsanity/nupic/sanity
 lein cljsbuild once demos
-cd ..
 ~~~
 
 ## Run
 
-Try an example!
+**The easy way:**
+
+Just patch your model!
+
+~~~python
+import htmsanity.nupic.runner as sanity
+sanity.patchCLAModel(model)
+~~~
+
+Sanity will automatically open in a web browser.
+
+**The other easy way:**
+
+Try a custom example.
 
 ~~~
 git clone https://github.com/nupic-community/sanity-nupic.git
@@ -60,9 +72,7 @@ python examples/hotgym_plotted.py
 python examples/research_feedback.py
 ~~~
 
-Sanity will automatically open in a web browser.
-
-## Use
+**The more adventurous way:**
 
 Here's an example that visualizes a CLAModel.
 
