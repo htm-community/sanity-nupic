@@ -16,7 +16,7 @@ Videos:
 pip install sanity-nupic --user
 ~~~
 
-Current version: `0.0.4`
+Current version: `0.0.6`
 
 **The adventurous way:**
 
