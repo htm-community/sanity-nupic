@@ -73,7 +73,11 @@ def makeRunnerRequestHandler(websocketPort):
                 self.wfile.write(content);
                 self.wfile.close();
             else:
+                curr = os.getcwd()
+                rootFolder = os.path.dirname(__file__)
+                os.chdir(rootFolder)
                 SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
+                os.chdir(curr)
 
     return RequestHandler
 
@@ -95,8 +99,6 @@ class SanityRunner(object):
         websocketPort = twistedData.socket.getsockname()[1]
 
         # Start the server that hosts the html / CSS / javascript
-        rootFolder = os.path.dirname(__file__)
-        os.chdir(rootFolder)
         server = SocketServer.TCPServer(("", 0),
                                         makeRunnerRequestHandler(websocketPort))
         serverThread = threading.Thread(target=server.serve_forever)
