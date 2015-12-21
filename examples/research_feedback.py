@@ -190,7 +190,7 @@ class FeedbackExperimentSanityModel(SanityModel):
             return []
 
     def query(self, bitHistory, getNetworkLayout=False, getBitStates=False,
-              getProximalSynapses=False, proximalSynapsesQuery={},
+              getProximalSegments=False, proximalSegmentsQuery={},
               getDistalSegments=False, distalSegmentsQuery={},
               getApicalSegments=False, apicalSegmentsQuery={}):
         senses = {
@@ -272,7 +272,6 @@ class FeedbackExperimentSanityModel(SanityModel):
                     distalSegments = segmentsFromConnections(tm.connections, tm,
                                                              columnsToCheck, onlySources,
                                                              sourcePath,
-                                                             tm.cellsPerColumn,
                                                              onlyActiveSynapses,
                                                              onlyConnectedSynapses)
                     regions['tm']['layer'].update({
@@ -290,7 +289,6 @@ class FeedbackExperimentSanityModel(SanityModel):
                     apicalSegments = segmentsFromConnections(tm.apicalConnections, tm,
                                                              columnsToCheck, onlySources,
                                                              sourcePath,
-                                                             sourceCellsPerColumn,
                                                              onlyActiveSynapses,
                                                              onlyConnectedSynapses,
                                                              sourceCellOffset)

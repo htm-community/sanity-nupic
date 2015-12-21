@@ -35,6 +35,7 @@ def makeSanityWebSocketClass(localTargets, localResources, remoteResources):
             writeHandlers.update({
                 deque: ArrayHandler,
                 numpy.uint32: NumpyIntHandler,
+                numpy.int64: NumpyIntHandler,
                 numpy.float32: NumpyFloatHandler,
                 numpy.ndarray: NumpyArrayHandler,
             })

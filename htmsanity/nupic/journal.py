@@ -1,10 +1,89 @@
-from collections import deque
+import collections
+
+def expandSegmentSelector(segSelector, segsByCol, defaultCells):
+    if isinstance(segSelector, collections.Mapping):
+        useSpecificCells = True
+        columns = segSelector.keys()
+    else:
+        useSpecificCells = False
+        columns = segSelector
+
+    for col in columns:
+        if useSpecificCells:
+            selectorWithinCol = segSelector[col]
+            if isinstance(selectorWithinCol, collections.Mapping):
+                useSpecificSegments = True
+                cells = selectorWithinCol.keys()
+            else:
+                useSpecificSegments = False
+                cells = selectorWithinCol
+        else:
+            useSpecificSegments = False
+            cells = defaultCells
+
+        segIndicesByCell = {}
+        for cell in cells:
+            if useSpecificSegments:
+                segIndicesByCell[cell] = selectorWithinCol[cell]
+            else:
+                if col in segsByCol:
+                    segIndicesByCell[cell] = xrange(len(segsByCol[col][cell]))
+                else:
+                    segIndicesByCell[cell] = []
+
+        yield (col, segIndicesByCell)
+
+
+def parseSegmentSelector(segSelector):
+    """Returns a column gating function that takes in a column number. If this
+    column is included in the selector, it returns a cell gating function.
+    Otherwise it returns None.
+
+    Continuing this pattern, this second function takes in a cell index. It
+    returns a segment gating function or None.
+
+    The segment gating function returns True or False.
+
+    """
+    if isinstance(segSelector, collections.Mapping):
+        useSpecificCells = True
+        columns = segSelector.keys()
+    else:
+        useSpecificCells = False
+        columns = segSelector
+
+    def columnGate(column):
+        if column in columns:
+            if useSpecificCells:
+                selectorWithinCol = segSelector[column]
+                useSpecificSegments = isinstance(selectorWithinCol, collections.Mapping)
+                def cellGate(cell):
+                    if cell in selectorWithinCol:
+                        if useSpecificSegments:
+                            def segmentGate(segIndex):
+                                return segIndex in selectorWithinCol[cell]
+                            return segmentGate
+                        else:
+                            def allowAllSegments(segIndex):
+                                return True
+                            return allowAllSegments
+                return cellGate
+            else:
+                def allowAllCells(cell):
+                    def allowAllSegments(segIndex):
+                        return True
+                    return allowAllSegments
+                return allowAllCells
+
+    return columnGate
 
 class Journal(object):
     def __init__(self, sanityModel):
         self.journal = []
         self.subscribers = []
-        self.nextModelId = 0
+        self.nextSnapshotId = 0
+        # The captureOptions and networkShape are shared with the client.
+        # Use hyphenated keys for these public formats.
         self.captureOptions = {
             'keep-steps': 50,
             'ff-synapses': {
@@ -26,7 +105,25 @@ class Journal(object):
             },
         }
 
-        self.stepTemplate = sanityModel.query(self.getBitHistory, getNetworkLayout=True)
+        networkLayout = sanityModel.query(self.getBitHistory, getNetworkLayout=True)
+        self.networkShape = {
+            'senses': {},
+            'regions': {},
+        }
+        for senseId, sense in networkLayout['senses'].items():
+            self.networkShape['senses'][senseId] = {
+                'ordinal': sense['ordinal'],
+                'dimensions': sense['dimensions'],
+            }
+        for rgnId, rgn in networkLayout['regions'].items():
+            self.networkShape['regions'][rgnId] = {}
+            for lyrId, lyr in rgn.items():
+                self.networkShape['regions'][rgnId][lyrId] = {
+                    'ordinal': lyr['ordinal'],
+                    'cells-per-column': lyr['cellsPerColumn'],
+                    'dimensions': lyr['dimensions'],
+                }
+
         self.append(sanityModel)
         sanityModel.addEventListener('didStep', lambda: self.append(sanityModel))
 
@@ -70,8 +167,8 @@ class Journal(object):
             onlyActive = self.captureOptions['ff-synapses']['only-active?']
             onlyConnected = self.captureOptions['ff-synapses']['only-connected?']
             queryArgs.update({
-                'getProximalSynapses': True,
-                'proximalSynapsesQuery': {
+                'getProximalSegments': True,
+                'proximalSegmentsQuery': {
                     'onlyActiveSynapses': onlyActive,
                     'onlyConnectedSynapses': onlyConnected,
                 },
@@ -104,11 +201,11 @@ class Journal(object):
 
         # TODO: only keep nKeepSteps models
 
-        modelId = self.nextModelId
-        self.nextModelId += 1
+        snapshotId = self.nextSnapshotId
+        self.nextSnapshotId += 1
 
         step = {
-            'model-id': modelId,
+            'snapshot-id': snapshotId,
             'timestep': sanityModel.timestep,
             'display-value': sanityModel.getInputDisplayText()
         }
@@ -124,189 +221,207 @@ class Journal(object):
         elif command == 'ping':
             pass
         elif command == 'subscribe':
-            stepsChannelMarshal, responseChannelMarshal = args
-
+            stepsChannelMarshal, = args
             self.subscribers.append(stepsChannelMarshal.ch)
 
-            responseChannelMarshal.ch.put([self.stepTemplate, self.captureOptions])
+        elif command == 'get-network-shape':
+            responseChannelMarshal, = args
+            responseChannelMarshal.ch.put(self.networkShape)
 
-        elif command == 'get-column-apical-segments':
-            modelId, rgnId, lyrId, col, responseChannelMarshal = args
-            modelData = self.journal[modelId]
+        elif command == 'get-capture-options':
+            responseChannelMarshal, = args
+            responseChannelMarshal.ch.put(self.captureOptions)
+
+        elif command == 'get-apical-segments':
+            snapshotId, rgnId, lyrId, segSelector, responseChannelMarshal = args
+            modelData = self.journal[snapshotId]
             layerData = modelData['regions'][rgnId][lyrId]
-            segments = layerData.get('apicalSegments', [])
-            columnSegments = filter(lambda seg: (seg['column'] == col), segments)
-            segmentsByCell = {}
-            for segment in columnSegments:
-                cell = segment['cell']
-                if cell not in segmentsByCell:
-                    segmentsByCell[cell] = {}
-                segmentIndex = len(segmentsByCell[cell])
-                segmentsByCell[cell][segmentIndex] = {
-                    'n-conn-act': segment['nConnectedActive'],
-                    'n-conn-tot': segment['nConnectedTotal'],
-                    'n-disc-act': segment['nDisconnectedActive'],
-                    'n-disc-tot': segment['nDisconnectedTotal'],
-                    'stimulus-th': layerData['nApicalStimulusThreshold'],
-                    'learning-th': layerData['nApicalLearningThreshold'],
-                }
-            responseChannelMarshal.ch.put(segmentsByCell)
+            segsByCol = layerData.get('apicalSegments', {})
 
-        elif command == 'get-column-distal-segments':
-            modelId, rgnId, lyrId, col, responseChannelMarshal = args
-            modelData = self.journal[modelId]
-            layerData = modelData['regions'][rgnId][lyrId]
-            segments = layerData.get('distalSegments', [])
-            columnSegments = filter(lambda seg: (seg['column'] == col), segments)
-            segmentsByCell = {}
-            for segment in columnSegments:
-                cell = segment['cell']
-                if cell not in segmentsByCell:
-                    segmentsByCell[cell] = {}
-                segmentIndex = len(segmentsByCell[cell])
-                segmentsByCell[cell][segmentIndex] = {
-                    'n-conn-act': segment['nConnectedActive'],
-                    'n-conn-tot': segment['nConnectedTotal'],
-                    'n-disc-act': segment['nDisconnectedActive'],
-                    'n-disc-tot': segment['nDisconnectedTotal'],
-                    'stimulus-th': layerData['nDistalStimulusThreshold'],
-                    'learning-th': layerData['nDistalLearningThreshold'],
-                }
-            responseChannelMarshal.ch.put(segmentsByCell)
-
-        elif command == 'get-column-proximal-segments':
-            modelId, rgnId, lyrId, col, responseChannelMarshal = args
-            # Only one proximal segment per column.  And nobody is checking
-            # nConnectedActive, etc., for proximal segments, so don't grab it.
-            cell = -1
-            segIndex = 0
-            seg = {}
-            response = {cell: {segIndex: seg}}
-            responseChannelMarshal.ch.put(response)
-
-        elif command == 'get-column-state-freqs':
-            modelId, responseChannelMarshal = args
-            modelData = self.journal[modelId]
+            layerTemplate = self.networkShape['regions'][rgnId][lyrId]
+            defaultCells = range(layerTemplate['cells-per-column'])
+            selectedIndices = expandSegmentSelector(segSelector, segsByCol, defaultCells)
 
             ret = {}
-            for rgnId, regionData in modelData['regions'].items():
-                for lyrId, layerData in regionData.items():
-                    layerDims = self.stepTemplate['regions'][rgnId][lyrId]['dimensions']
-                    size = reduce(lambda x, y: x * y, layerDims, 1)
-
-                    activeColumns = layerData['activeColumns']
-                    if modelId > 0:
-                        prevModelData = self.journal[modelId - 1]
-                        prevLayerData = prevModelData['regions'][rgnId][lyrId]
-                        prevPredColumns = prevLayerData['predictedColumns']
-                    else:
-                        prevPredColumns = set()
-
-                    path = (rgnId, lyrId)
-                    ret[path] = {
-                        'active': len(activeColumns - prevPredColumns),
-                        'predicted': len(prevPredColumns - activeColumns),
-                        'active-predicted': len(activeColumns & prevPredColumns),
-                        'timestep': modelId,
-                        'size': size,
-                    }
+            for col, segIndicesByCell in selectedIndices:
+                ret[col] = {}
+                for cellIndex, segIndices in segIndicesByCell.items():
+                    ret[col][cellIndex] = {}
+                    for segIndex in segIndices:
+                        segment = segsByCol[col][cellIndex][segIndex]
+                        ret[col][cellIndex][segIndex] = {
+                            'n-conn-act': segment['nConnectedActive'],
+                            'n-conn-tot': segment['nConnectedTotal'],
+                            'n-disc-act': segment['nDisconnectedActive'],
+                            'n-disc-tot': segment['nDisconnectedTotal'],
+                            'stimulus-th': layerData['nApicalStimulusThreshold'],
+                            'learning-th': layerData['nApicalLearningThreshold'],
+                        }
 
             responseChannelMarshal.ch.put(ret)
 
-        elif command == 'get-apical-segment-synapses':
-            modelId, rgnId, lyrId, col, cellIndex, segIndex, synStates, responseChannelMarshal = args
-            modelData = self.journal[modelId]
+        elif command == 'get-distal-segments':
+            snapshotId, rgnId, lyrId, segSelector, responseChannelMarshal = args
+            modelData = self.journal[snapshotId]
             layerData = modelData['regions'][rgnId][lyrId]
-            segments = layerData.get('apicalSegments', [])
-            response = self.getSegmentSynapsesResponse(segments, col, cellIndex,
-                                                       segIndex, synStates)
-            responseChannelMarshal.ch.put(response)
+            segsByCol = layerData.get('distalSegments', {})
 
-        elif command == 'get-distal-segment-synapses':
-            modelId, rgnId, lyrId, col, cellIndex, segIndex, synStates, responseChannelMarshal = args
-            modelData = self.journal[modelId]
-            layerData = modelData['regions'][rgnId][lyrId]
-            segments = layerData.get('distalSegments', [])
-            response = self.getSegmentSynapsesResponse(segments, col, cellIndex,
-                                                       segIndex, synStates)
-            responseChannelMarshal.ch.put(response)
+            layerTemplate = self.networkShape['regions'][rgnId][lyrId]
+            defaultCells = range(layerTemplate['cells-per-column'])
+            selectedIndices = expandSegmentSelector(segSelector, segsByCol, defaultCells)
 
-        elif command == 'get-proximal-segment-synapses':
-            modelId, rgnId, lyrId, col, cellIndex, segIndex, synStates, responseChannelMarshal = args
-            assert cellIndex is -1
-            assert segIndex is 0
-            modelData = self.journal[modelId]
-            layerData = modelData['regions'][rgnId][lyrId]
-            proximalSynapses = layerData.get('proximalSynapses', {})
-            synsByState = {}
-            for sourcePath, synapsesByState in proximalSynapses.items():
-                for state, synapses in synapsesByState.items():
-                    if state in synStates:
-                        syns = deque()
-                        synapseTemplate = {
-                            'src-id': sourcePath[1],
-                            'syn-state': state,
+            ret = {}
+            for col, segIndicesByCell in selectedIndices:
+                ret[col] = {}
+                for cellIndex, segIndices in segIndicesByCell.items():
+                    ret[col][cellIndex] = {}
+                    for segIndex in segIndices:
+                        segment = segsByCol[col][cellIndex][segIndex]
+                        ret[col][cellIndex][segIndex] = {
+                            'n-conn-act': segment['nConnectedActive'],
+                            'n-conn-tot': segment['nConnectedTotal'],
+                            'n-disc-act': segment['nDisconnectedActive'],
+                            'n-disc-tot': segment['nDisconnectedTotal'],
+                            'stimulus-th': layerData['nDistalStimulusThreshold'],
+                            'learning-th': layerData['nDistalLearningThreshold'],
                         }
-                        if sourcePath[0] == 'regions':
-                            synapseTemplate['src-lyr'] = sourcePath[2]
 
-                        for column, sourceColumn, perm in synapses:
-                            if column == col:
-                                syn = synapseTemplate.copy()
-                                syn.update({
-                                    'src-col': sourceColumn,
-                                    'perm': perm,
-                                    'src-dt': 0, # TODO don't assume this
-                                })
-                                syns.append(syn)
+            responseChannelMarshal.ch.put(ret)
 
-                        synsByState[state] = syns
+        elif command == 'get-proximal-segments':
+            snapshotId, rgnId, lyrId, segSelector, responseChannelMarshal = args
+            modelData = self.journal[snapshotId]
+            layerData = modelData['regions'][rgnId][lyrId]
+            segsByCol = layerData.get('proximalSegments', {})
 
-            responseChannelMarshal.ch.put(synsByState)
+            defaultCells = [-1]
+            selectedIndices = expandSegmentSelector(segSelector, segsByCol, [-1])
+
+            ret = {}
+            for col, segIndicesByCell in selectedIndices:
+                ret[col] = {}
+                for cellIndex, segIndices in segIndicesByCell.items():
+                    ret[col][cellIndex] = {}
+                    for segIndex in segIndices:
+                        segment = segsByCol[col][cellIndex][segIndex]
+                        ret[col][cellIndex][segIndex] = {}
+
+            responseChannelMarshal.ch.put(ret)
+
+        elif command == 'get-layer-stats':
+            snapshotId, rgnId, lyrId, fetches, responseChannelMarshal = args
+
+            if snapshotId > 0:
+                prevModelData = self.journal[snapshotId - 1]
+                prevLayerData = prevModelData['regions'][rgnId][lyrId]
+                prevPredColumns = prevLayerData['predictedColumns']
+            else:
+                prevPredColumns = set()
+
+            modelData = self.journal[snapshotId]
+            layerData = modelData['regions'][rgnId][lyrId]
+            activeColumns = layerData['activeColumns']
+
+            ret = {}
+
+            if 'n-unpredicted-active-columns' in fetches:
+                ret['n-unpredicted-active-columns'] = len(activeColumns - prevPredColumns)
+
+            if 'n-predicted-inactive-columns' in fetches:
+                ret['n-predicted-inactive-columns'] = len(prevPredColumns - activeColumns)
+
+            if 'n-predicted-active-columns' in fetches:
+                ret['n-predicted-active-columns'] = len(activeColumns & prevPredColumns)
+
+            responseChannelMarshal.ch.put(ret)
+
+        elif command == 'get-apical-synapses':
+            snapshotId, rgnId, lyrId, segSelector, synStates, responseChannelMarshal = args
+            modelData = self.journal[snapshotId]
+            layerData = modelData['regions'][rgnId][lyrId]
+            segsByCol = layerData.get('apicalSegments', {})
+
+            layerTemplate = self.networkShape['regions'][rgnId][lyrId]
+            defaultCells = range(layerTemplate['cells-per-column'])
+            selectedIndices = expandSegmentSelector(segSelector, segsByCol, defaultCells)
+
+            response = self.getSynapsesResponse(segsByCol, selectedIndices, synStates, -1)
+            responseChannelMarshal.ch.put(response)
+
+        elif command == 'get-distal-synapses':
+            snapshotId, rgnId, lyrId, segSelector, synStates, responseChannelMarshal = args
+            modelData = self.journal[snapshotId]
+            layerData = modelData['regions'][rgnId][lyrId]
+            segsByCol = layerData.get('distalSegments', {})
+
+            layerTemplate = self.networkShape['regions'][rgnId][lyrId]
+            defaultCells = range(layerTemplate['cells-per-column'])
+            selectedIndices = expandSegmentSelector(segSelector, segsByCol, defaultCells)
+
+            response = self.getSynapsesResponse(segsByCol, selectedIndices, synStates, -1)
+            responseChannelMarshal.ch.put(response)
+
+        elif command == 'get-proximal-synapses':
+            snapshotId, rgnId, lyrId, segSelector, synStates, responseChannelMarshal = args
+            modelData = self.journal[snapshotId]
+            layerData = modelData['regions'][rgnId][lyrId]
+            segsByCol = layerData.get('proximalSegments', {})
+
+            defaultCells = [-1]
+            selectedIndices = expandSegmentSelector(segSelector, segsByCol, defaultCells)
+
+            response = self.getSynapsesResponse(segsByCol, selectedIndices, synStates, 0)
+
+            responseChannelMarshal.ch.put(response)
 
         elif command == 'get-column-cells':
-            modelId, rgnId, lyrId, col, responseChannelMarshal = args
-            modelData = self.journal[modelId]
+            snapshotId, rgnId, lyrId, col, fetches, responseChannelMarshal = args
+            modelData = self.journal[snapshotId]
             layerData = modelData['regions'][rgnId][lyrId]
-            layerTemplate = self.stepTemplate['regions'][rgnId][lyrId]
-            cellsPerColumn = layerTemplate['cellsPerColumn']
+            layerTemplate = self.networkShape['regions'][rgnId][lyrId]
+            cellsPerColumn = layerTemplate['cells-per-column']
             firstCellInCol = col * cellsPerColumn
             activeCellsInCol = set(cellId - firstCellInCol
                                    for cellId in layerData['activeCells']
                                    if (cellId >= firstCellInCol and
                                        cellId < firstCellInCol + cellsPerColumn))
             predictedCellsInCol = []
-            if modelId > 0:
-                prevModelData = self.journal[modelId - 1]
+            if snapshotId > 0:
+                prevModelData = self.journal[snapshotId - 1]
                 prevLayerData = prevModelData['regions'][rgnId][lyrId]
                 predictedCellsInCol = set(cellId - firstCellInCol
                                           for cellId in prevLayerData['predictedCells']
                                           if (cellId >= firstCellInCol and
                                               cellId < firstCellInCol + cellsPerColumn))
-            responseChannelMarshal.ch.put({
-                'cells-per-column': cellsPerColumn,
-                'active-cells': activeCellsInCol,
-                'prior-predicted-cells': predictedCellsInCol,
-            })
+
+            ret = {}
+
+            if 'active-cells' in fetches:
+                ret['active-cells'] = activeCellsInCol
+
+            if 'prior-predicted-cells' in fetches:
+                ret['prior-predicted-cells'] = predictedCellsInCol
+
+            responseChannelMarshal.ch.put(ret)
 
         elif command == 'get-layer-bits':
-            modelId, rgnId, lyrId, fetches, cachedOnscreenBits, responseChannelMarshal = args
+            snapshotId, rgnId, lyrId, fetches, cachedOnscreenBits, responseChannelMarshal = args
 
             ret = {}
             if 'active-columns' in fetches:
-                layerData = self.journal[modelId]['regions'][rgnId][lyrId]
+                layerData = self.journal[snapshotId]['regions'][rgnId][lyrId]
                 ret['active-columns'] = layerData['activeColumns']
 
             if 'pred-columns' in fetches:
-                if modelId > 0:
-                    prevLayerData = self.journal[modelId - 1]['regions'][rgnId][lyrId]
+                if snapshotId > 0:
+                    prevLayerData = self.journal[snapshotId - 1]['regions'][rgnId][lyrId]
                     ret['pred-columns'] = prevLayerData['predictedColumns']
 
             responseChannelMarshal.ch.put(ret)
 
         elif command == 'get-sense-bits':
-            modelId, senseId, fetches, cachedOnscreenBits, responseChannelMarshal = args
-            senseData = self.journal[modelId]['senses'][senseId]
+            snapshotId, senseId, fetches, cachedOnscreenBits, responseChannelMarshal = args
+            senseData = self.journal[snapshotId]['senses'][senseId]
 
             ret = {}
             if 'active-bits' in fetches:
@@ -317,44 +432,46 @@ class Journal(object):
         elif command == 'set-capture-options':
             captureOptions, = args
             self.captureOptions = captureOptions
+
         else:
             print "Unrecognized command! %s" % command
 
-    def getSegmentSynapsesResponse(self, segments, col, cellIndex, segIndex, synStates):
-        # Find the segment
-        segment = None
-        nextSegIndex = 0
-        assert(segIndex >= 0)
-        for seg in segments:
-            if seg['column'] == col and seg['cell'] == cellIndex:
-                if nextSegIndex == segIndex:
-                    segment = seg
-                    break
-                else:
-                    nextSegIndex += 1
+    def getSynapsesResponse(self, segsByCol, selectedIndices, synStates, dt):
+        ret = {}
+        for col, segIndicesByCell in selectedIndices:
+            ret[col] = {}
+            for cellIndex, segIndices in segIndicesByCell.items():
+                ret[col][cellIndex] = {}
+                for segIndex in segIndices:
+                    ret[col][cellIndex][segIndex] = {}
+                    segment = segsByCol[col][cellIndex][segIndex]
+                    for sourcePath, synapsesByState in segment['synapses'].items():
+                        synapseTemplate = {}
+                        synapseTemplate['src-id'] = sourcePath[1]
+                        if sourcePath[0] == 'regions':
+                            synapseTemplate['src-lyr'] = sourcePath[2]
 
-        retSynsByState = {}
-        for sourcePath, synapsesByState in segment['synapses'].items():
-            synapseTemplate = {}
-            if sourcePath:
-                synapseTemplate['src-id'] = sourcePath[1]
-                if sourcePath[0] == 'regions':
-                    synapseTemplate['src-lyr'] = sourcePath[2]
+                        for state, synapses in synapsesByState.items():
+                            if state in synStates:
+                                syns = []
+                                for sourceBit, perm in synapses:
+                                    # TODO use synapse permanence from the
+                                    # beginning of the timestep. Otherwise we're
+                                    # calculating which synapses were active
+                                    # using the post-learning permanences. (Only
+                                    # in the visualization layer, not NuPIC
+                                    # itself)
+                                    syn = synapseTemplate.copy()
+                                    syn.update({
+                                        "src-i": sourceBit,
+                                        "perm": perm,
+                                        "src-dt": dt, # TODO don't assume this
+                                    })
+                                    syns.append(syn)
 
-            for state, synapses in synapsesByState.items():
-                if state in synStates:
-                    syns = deque()
-                    for targetCol, targetCell, perm in synapses:
-                        # TODO use synapse permanence from the beginning of the
-                        # timestep. Otherwise we're calculating which synapses
-                        # were active using the post-learning permanences.
-                        # (Only in the visualization layer, not NuPIC itself)
-                        syn = synapseTemplate.copy()
-                        syn.update({
-                            "src-col": targetCol,
-                            "perm": perm,
-                            "src-dt": 1, # TODO don't assume this
-                        })
-                        syns.append(syn)
-                        retSynsByState[state] = syns
-        return retSynsByState
+                                if state not in ret[col][cellIndex][segIndex]:
+                                    ret[col][cellIndex][segIndex][state] = []
+
+                                ret[col][cellIndex][segIndex][state].extend(syns)
+
+        return ret

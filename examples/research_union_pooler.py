@@ -42,7 +42,7 @@ class UnionPoolingExperimentSanityModel(SanityModel):
             return []
 
     def query(self, bitHistory, getNetworkLayout=False, getBitStates=False,
-              getProximalSynapses=False, proximalSynapsesQuery={},
+              getProximalSegments=False, proximalSegmentsQuery={},
               getDistalSegments=False, distalSegmentsQuery={},
               getApicalSegments=False, apicalSegmentsQuery={}):
         senses = {
@@ -92,13 +92,12 @@ class UnionPoolingExperimentSanityModel(SanityModel):
                 'predictedColumns': set(),
             })
 
-        if getProximalSynapses:
+        if getProximalSegments:
             assert getBitStates
             upSynapses = proximalSynapsesFromSP(up,
                                                 regions['tm']['layer']['activeCells'],
-                                                proximalSynapsesQuery['onlyActiveSynapses'],
-                                                proximalSynapsesQuery['onlyConnectedSynapses'],
-                                                sourceDepth=tm.cellsPerColumn)
+                                                proximalSegmentsQuery['onlyActiveSynapses'],
+                                                proximalSegmentsQuery['onlyConnectedSynapses'])
             regions['up']['layer'].update({
                 'proximalSynapses': {
                     ('regions', 'tm', 'layer'): upSynapses,
@@ -113,14 +112,12 @@ class UnionPoolingExperimentSanityModel(SanityModel):
                                   prevState['regions']['tm']['layer']['predictedColumns'])
                 onlySources = prevState['regions']['tm']['layer']['activeCells']
                 sourcePath = ('regions', 'tm', 'layer')
-                sourceCellsPerColumn = tm.cellsPerColumn
                 onlyActiveSynapses = distalSegmentsQuery['onlyActiveSynapses']
                 onlyConnectedSynapses = distalSegmentsQuery['onlyConnectedSynapses']
                 distalSegments = segmentsFromConnections(tm.connections, tm,
                                                          columnsToCheck,
                                                          onlySources,
                                                          sourcePath,
-                                                         sourceCellsPerColumn,
                                                          onlyActiveSynapses,
                                                          onlyConnectedSynapses)
                 regions['tm']['layer'].update({
