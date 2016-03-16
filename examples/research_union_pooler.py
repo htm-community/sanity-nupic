@@ -9,7 +9,7 @@ from nupic.data.generators.pattern_machine import PatternMachine
 from nupic.data.generators.sequence_machine import SequenceMachine
 
 from htmsanity.nupic.runner import SanityRunner
-from htmsanity.nupic.model import SanityModel, proximalSynapsesFromSP, segmentsFromConnections
+from htmsanity.nupic.model import SanityModel, proximalSegmentsFromSP, segmentsFromConnections
 
 class UnionPoolingExperimentSanityModel(SanityModel):
     def __init__(self, experiment, patterns, labels):
@@ -94,14 +94,12 @@ class UnionPoolingExperimentSanityModel(SanityModel):
 
         if getProximalSegments:
             assert getBitStates
-            upSynapses = proximalSynapsesFromSP(up,
-                                                regions['tm']['layer']['activeCells'],
-                                                proximalSegmentsQuery['onlyActiveSynapses'],
-                                                proximalSegmentsQuery['onlyConnectedSynapses'])
+            upSegs = proximalSegmentsFromSP(up,
+                                            regions['tm']['layer']['activeCells'],
+                                            proximalSegmentsQuery['onlyActiveSynapses'],
+                                            proximalSegmentsQuery['onlyConnectedSynapses'])
             regions['up']['layer'].update({
-                'proximalSynapses': {
-                    ('regions', 'tm', 'layer'): upSynapses,
-                },
+                'proximalSegments': proximalSegs,
             })
 
         if getDistalSegments:
