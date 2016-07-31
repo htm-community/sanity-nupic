@@ -14,7 +14,7 @@ from twisted.python import log
 import marshalling as marshal
 from simulation import Simulation
 from journal import Journal
-from model import CLASanityModel
+from model import CLASanityModel, ExtendedTemporalMemorySanityModel
 from websocket import makeSanityWebSocketClass
 
 PAGE = """
@@ -92,7 +92,7 @@ class SanityRunner(object):
 
     def start(self, launchBrowser=True, useBackgroundThread=False):
         # Initialize the websocket, and gets its port
-        factory = WebSocketServerFactory(debug=False)
+        factory = WebSocketServerFactory()
         factory.protocol = makeSanityWebSocketClass(self.localTargets, {}, {})
         log.startLogging(sys.stdout)
         twistedData = reactor.listenTCP(0, factory)
@@ -138,6 +138,7 @@ class CLASanityModelPatched(CLASanityModel):
 
         return ret
 
+
 def patchCLAModel(model):
     sanityModel = CLASanityModelPatched(model)
     runner = SanityRunner(sanityModel, startSimThread=False)
@@ -148,6 +149,7 @@ def patchCLAModel(model):
         while True:
             if simulation.nStepsQueued > 0:
                 shouldGo = True
+                simulation.nStepsQueued -= 1
             else:
                 shouldGo = simulation.isGoing
 
@@ -162,3 +164,56 @@ def patchCLAModel(model):
                 simulation.checkStatusEvent.clear()
 
     model.run = myRun
+
+
+class ETMSanityModelPatched(ExtendedTemporalMemorySanityModel):
+    def __init__(self, model):
+        super(ETMSanityModelPatched, self).__init__(model)
+
+    def step(self):
+        assert False
+
+    def getInputDisplayText(self):
+        return ""
+
+
+def patchETM(etm):
+    sanityModel = ETMSanityModelPatched(etm)
+    runner = SanityRunner(sanityModel, startSimThread=False)
+    runner.start(useBackgroundThread=True)
+    simulation = runner.simulation
+    computeMethod = etm.compute
+
+    def myCompute(activeColumns,
+                  activeExternalCells=None,
+                  activeApicalCells=None,
+                  formInternalConnections=True,
+                  learn=True):
+        while True:
+            if simulation.nStepsQueued > 0:
+                shouldGo = True
+                simulation.nStepsQueued -= 1
+            else:
+                shouldGo = simulation.isGoing
+
+            if shouldGo:
+                computeMethod(activeColumns,
+                              activeExternalCells,
+                              activeApicalCells,
+                              formInternalConnections,
+                              learn)
+                sanityModel.activeColumns = activeColumns
+                sanityModel.activeExternalCellsBasal = (activeExternalCells
+                                                        if activeExternalCells is not None
+                                                        else [])
+                sanityModel.activeExternalCellsApical = (activeApicalCells
+                                                         if activeApicalCells is not None
+                                                         else [])
+                sanityModel.onStepped()
+                return
+            else:
+                # Having a timeout makes it receptive to ctrl+c...
+                simulation.checkStatusEvent.wait(999999)
+                simulation.checkStatusEvent.clear()
+
+    etm.compute = myCompute
