@@ -64,7 +64,7 @@ class UnionPoolingExperimentSanityModel(SanityModel):
 
             regions['up']['layer'].update({
                 'cellsPerColumn': 1,
-                'dimensions': up.getColumnDimensions().tolist(),
+                'dimensions': list(up.getColumnDimensions()),
                 'ordinal': 1,
             })
 

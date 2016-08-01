@@ -3,15 +3,15 @@ from collections import deque
 
 from nupic.data.generators.pattern_machine import PatternMachine
 from nupic.data.generators.sequence_machine import SequenceMachine
-from htmresearch.algorithms.general_temporal_memory import GeneralTemporalMemory
+from htmresearch.algorithms.extended_temporal_memory import ExtendedTemporalMemory
 from nupic.research.monitor_mixin.temporal_memory_monitor_mixin import (
     TemporalMemoryMonitorMixin)
 
 from htmsanity.nupic.runner import SanityRunner
 from htmsanity.nupic.model import SanityModel, segmentsFromConnections
 
-class MonitoredGeneralTemporalMemory(TemporalMemoryMonitorMixin,
-                                     GeneralTemporalMemory):
+class MonitoredExtendedTemporalMemory(TemporalMemoryMonitorMixin,
+                                     ExtendedTemporalMemory):
     pass
 
 DEFAULT_TEMPORAL_MEMORY_PARAMS = {
@@ -319,7 +319,7 @@ def experiment2():
     """
     print "Initializing temporal memory..."
     params = dict(DEFAULT_TEMPORAL_MEMORY_PARAMS)
-    tmFeedback = MonitoredGeneralTemporalMemory(mmName="TM2", **params)
+    tmFeedback = MonitoredExtendedTemporalMemory(mmName="TM2", **params)
     feedback_n = 400
     trials = 30
     print "Done."
