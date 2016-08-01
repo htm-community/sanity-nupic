@@ -1,6 +1,6 @@
 # Sanity for NuPIC
 
-A [NuPIC](https://github.com/numenta/nupic) backend for [Sanity](https://github.com/nupic-community/sanity).
+A [NuPIC](https://github.com/numenta/nupic) backend for [Sanity](https://github.com/htm-community/sanity).
 
 Videos:
 
@@ -33,7 +33,17 @@ Install the `sanity-nupic` python package;
 python setup.py develop --user
 ~~~
 
-Compile [Sanity](https://github.com/nupic-community/sanity) from ClojureScript to JavaScript. You'll need Leiningen, which you can get through `brew install leiningen`, or just follow instructions on [the website](http://leiningen.org/).
+Compile [Sanity](https://github.com/htm-community/sanity) from ClojureScript to JavaScript. You'll need Leiningen, which you can get through `brew install leiningen`, or just follow instructions on [the website](http://leiningen.org/).
+
+Install Comportex, a Sanity dependency.
+
+~~~
+git clone https://github.com/htm-community/comportex.git
+cd comportex
+lein install
+~~~
+
+Compile Sanity to JavaScript.
 
 ~~~
 # Requires JVM
@@ -59,7 +69,7 @@ Sanity will automatically open in a web browser.
 Try a custom example.
 
 ~~~
-git clone https://github.com/nupic-community/sanity-nupic.git
+git clone https://github.com/htm-community/sanity-nupic.git
 cd sanity-nupic
 
 # Hello world
