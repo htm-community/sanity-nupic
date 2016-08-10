@@ -4,7 +4,7 @@ import sys
 from setuptools import find_packages, setup
 
 setup(name="sanity-nupic",
-      version="0.0.8",
+      version="0.0.9",
       description="NuPIC server for Sanity client",
       author="Marcus Lewis",
       author_email="mrcslws@gmail.com",
