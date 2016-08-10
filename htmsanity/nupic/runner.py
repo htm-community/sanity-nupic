@@ -14,7 +14,8 @@ from twisted.python import log
 import marshalling as marshal
 from simulation import Simulation
 from journal import Journal
-from model import CLASanityModel, ExtendedTemporalMemorySanityModel
+from model import (CLASanityModel, TemporalMemorySanityModel,
+                   ExtendedTemporalMemorySanityModel)
 from websocket import makeSanityWebSocketClass
 
 PAGE = """
@@ -217,3 +218,44 @@ def patchETM(etm):
                 simulation.checkStatusEvent.clear()
 
     etm.compute = myCompute
+
+
+class TMSanityModelPatched(TemporalMemorySanityModel):
+    def __init__(self, model):
+        super(TMSanityModelPatched, self).__init__(model)
+
+    def step(self):
+        assert False
+
+    def getInputDisplayText(self):
+        return ""
+
+
+def patchTM(tm):
+    sanityModel = TMSanityModelPatched(tm)
+    runner = SanityRunner(sanityModel, startSimThread=False)
+    runner.start(useBackgroundThread=True)
+    simulation = runner.simulation
+    computeMethod = tm.compute
+
+    def myCompute(activeColumns,
+                  learn=True):
+        while True:
+            if simulation.nStepsQueued > 0:
+                shouldGo = True
+                simulation.nStepsQueued -= 1
+            else:
+                shouldGo = simulation.isGoing
+
+            if shouldGo:
+                computeMethod(activeColumns,
+                              learn)
+                sanityModel.activeColumns = activeColumns
+                sanityModel.onStepped()
+                return
+            else:
+                # Having a timeout makes it receptive to ctrl+c...
+                simulation.checkStatusEvent.wait(999999)
+                simulation.checkStatusEvent.clear()
+
+    tm.compute = myCompute
