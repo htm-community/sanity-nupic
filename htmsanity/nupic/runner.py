@@ -52,13 +52,13 @@ PAGE = """
   <script type="text/javascript" src="sanity/public/demos/out/sanity.js"></script>
   <script type="text/javascript">goog.require("org.numenta.sanity.demos.runner");</script>
   <script type="text/javascript">
-    org.numenta.sanity.demos.runner.init("NuPIC", "ws://localhost:%d", "capture", "drawing", "time-plots");
+    org.numenta.sanity.demos.runner.init("NuPIC", "ws://localhost:%d", "%s", "capture", "drawing", "time-plots");
   </script>
 </body>
 </html>
 """
 
-def makeRunnerRequestHandler(websocketPort):
+def makeRunnerRequestHandler(websocketPort, selectedTab):
     class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         def do_GET(self):
             filePath = self.path
@@ -70,7 +70,7 @@ def makeRunnerRequestHandler(websocketPort):
                 self.send_response(200)
                 self.send_header('Content-Type', 'text/html')
                 self.end_headers()
-                content = PAGE % websocketPort
+                content = PAGE % (websocketPort, selectedTab)
                 self.wfile.write(content);
                 self.wfile.close();
             else:
@@ -91,7 +91,8 @@ class SanityRunner(object):
             'journal': marshal.channel(self.journal),
         }
 
-    def start(self, launchBrowser=True, useBackgroundThread=False):
+    def start(self, launchBrowser=True, useBackgroundThread=False,
+              selectedTab="capture"):
         # Initialize the websocket, and gets its port
         factory = WebSocketServerFactory()
         factory.protocol = makeSanityWebSocketClass(self.localTargets, {}, {})
@@ -101,7 +102,8 @@ class SanityRunner(object):
 
         # Start the server that hosts the html / CSS / javascript
         server = SocketServer.TCPServer(("", 0),
-                                        makeRunnerRequestHandler(websocketPort))
+                                        makeRunnerRequestHandler(websocketPort,
+                                                                 selectedTab))
         serverThread = threading.Thread(target=server.serve_forever)
         serverThread.daemon = True
         serverThread.start()
@@ -203,7 +205,7 @@ def patchETM(etm):
     runner = SanityRunner(sanityModel,
                           captureOptions=captureOptions,
                           startSimThread=False)
-    runner.start(useBackgroundThread=True)
+    runner.start(useBackgroundThread=True, selectedTab="drawing")
     simulation = runner.simulation
     computeMethod = etm.compute
 
@@ -278,7 +280,7 @@ def patchTM(tm):
     runner = SanityRunner(sanityModel,
                           captureOptions=captureOptions,
                           startSimThread=False)
-    runner.start(useBackgroundThread=True)
+    runner.start(useBackgroundThread=True, selectedTab="drawing")
     simulation = runner.simulation
     computeMethod = tm.compute
 
