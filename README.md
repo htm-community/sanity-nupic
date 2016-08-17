@@ -8,9 +8,7 @@ Videos:
   - [With Q&A](https://www.youtube.com/watch?v=OHSuydq2OW4)
 - [See your HTM run: Duct tape is okay!](https://www.youtube.com/watch?v=bqu-hc4pc7Q)
 
-## Install
-
-**The easy way:**
+## How to use it
 
 ~~~
 pip install sanity-nupic --user
@@ -18,7 +16,33 @@ pip install sanity-nupic --user
 
 Current version: `0.0.10`
 
-**The adventurous way:**
+Now, just patch your model.
+
+**CLAModel**
+
+~~~python
+import htmsanity.nupic.runner as sanity
+sanity.patchCLAModel(model)
+~~~
+
+**Temporal Memory**
+
+~~~python
+import htmsanity.nupic.runner as sanity
+sanity.patchTM(tm)
+~~~
+
+Sanity will automatically open in a web browser.
+
+Don't let your Python script exit. If necessary, add this to the end:
+
+~~~python
+import time
+time.sleep(999999)
+~~~
+
+
+## How to develop it
 
 Clone `sanity-nupic`, and fetch the submodules:
 
@@ -51,20 +75,7 @@ cd htmsanity/nupic/sanity
 lein cljsbuild once demos
 ~~~
 
-## Run
-
-**The easy way:**
-
-Just patch your model!
-
-~~~python
-import htmsanity.nupic.runner as sanity
-sanity.patchCLAModel(model)
-~~~
-
-Sanity will automatically open in a web browser.
-
-**The other easy way:**
+## Other usage
 
 Try a custom example.
 
@@ -81,8 +92,6 @@ python examples/hotgym_plotted.py
 # Requires nupic.research
 python examples/research_feedback.py
 ~~~
-
-**The more adventurous way:**
 
 Here's an example that visualizes a CLAModel.
 
