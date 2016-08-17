@@ -630,9 +630,14 @@ class ExtendedTemporalMemorySanityModel(SanityModel):
             assert getBitStates
             try:
                 prevState = bitHistory.next()
-                columnsToCheck = (regions['tm']['layer']['activeColumns'] |
-                                  prevState['regions']['tm']['layer']['predictedColumns'])
+
                 if getDistalSegments:
+                    if distalSegmentsQuery['onlyNoteworthyColumns']:
+                        columnsToCheck = (regions['tm']['layer']['activeColumns'] |
+                                          prevState['regions']['tm']['layer']['predictedColumns'])
+                    else:
+                        columnsToCheck = xrange(self.tm.numberOfColumns())
+
                     activeBits = prevState['regions']['tm']['layer']['activeCells']
                     activeBits.update(cell + tm.numberOfCells()
                                       for cell in prevState['senses']['external']['activeBits'])
@@ -656,6 +661,12 @@ class ExtendedTemporalMemorySanityModel(SanityModel):
                         "nDistalStimulusThreshold": tm.getActivationThreshold(),
                     })
                 if getApicalSegments:
+                    if apicalSegmentsQuery['onlyNoteworthyColumns']:
+                        columnsToCheck = (regions['tm']['layer']['activeColumns'] |
+                                          prevState['regions']['tm']['layer']['predictedColumns'])
+                    else:
+                        columnsToCheck = xrange(self.tm.numberOfColumns())
+
                     activeBits = prevState['regions']['tm']['layer']['activeCells']
 
                     activeBits.update(cell + tm.numberOfCells()
@@ -731,8 +742,12 @@ class TemporalMemorySanityModel(SanityModel):
             assert getBitStates
             try:
                 prevState = bitHistory.next()
-                columnsToCheck = (regions['tm']['layer']['activeColumns'] |
-                                  prevState['regions']['tm']['layer']['predictedColumns'])
+
+                if distalSegmentsQuery['onlyNoteworthyColumns']:
+                    columnsToCheck = (regions['tm']['layer']['activeColumns'] |
+                                      prevState['regions']['tm']['layer']['predictedColumns'])
+                else:
+                    columnsToCheck = xrange(self.tm.numberOfColumns())
 
                 activeBits = prevState['regions']['tm']['layer']['activeCells']
 

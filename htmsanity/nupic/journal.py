@@ -181,22 +181,26 @@ class Journal(object):
         if self.captureOptions['distal-synapses']['capture?']:
             onlyActive = self.captureOptions['distal-synapses']['only-active?']
             onlyConnected = self.captureOptions['distal-synapses']['only-connected?']
+            onlyNoteworthy = self.captureOptions['distal-synapses']['only-noteworthy-columns?']
             queryArgs.update({
                 'getDistalSegments': True,
                 'distalSegmentsQuery': {
                     'onlyActiveSynapses': onlyActive,
                     'onlyConnectedSynapses': onlyConnected,
+                    'onlyNoteworthyColumns': onlyNoteworthy,
                 },
             })
 
         if self.captureOptions['apical-synapses']['capture?']:
             onlyActive = self.captureOptions['apical-synapses']['only-active?']
             onlyConnected = self.captureOptions['apical-synapses']['only-connected?']
+            onlyNoteworthy = self.captureOptions['apical-synapses']['only-noteworthy-columns?']
             queryArgs.update({
                 'getApicalSegments': True,
                 'apicalSegmentsQuery': {
                     'onlyActiveSynapses': onlyActive,
                     'onlyConnectedSynapses': onlyConnected,
+                    'onlyNoteworthyColumns': onlyNoteworthy,
                 },
             })
 
