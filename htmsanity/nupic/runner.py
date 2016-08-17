@@ -83,8 +83,8 @@ def makeRunnerRequestHandler(websocketPort):
     return RequestHandler
 
 class SanityRunner(object):
-    def __init__(self, sanityModel, startSimThread=True):
-        self.journal = Journal(sanityModel)
+    def __init__(self, sanityModel, captureOptions=None, startSimThread=True):
+        self.journal = Journal(sanityModel, captureOptions)
         self.simulation = Simulation(sanityModel, startSimThread)
         self.localTargets = {
             'simulation': marshal.channel(self.simulation),
@@ -180,7 +180,29 @@ class ETMSanityModelPatched(ExtendedTemporalMemorySanityModel):
 
 def patchETM(etm):
     sanityModel = ETMSanityModelPatched(etm)
-    runner = SanityRunner(sanityModel, startSimThread=False)
+    captureOptions = {
+        'keep-steps': 2000,
+        'ff-synapses': {
+            'capture?': True,
+            'only-active?': False,
+            'only-connected?': False,
+        },
+        'distal-synapses': {
+            'capture?': True,
+            'only-active?': False,
+            'only-connected?': False,
+            'only-noteworthy-columns?': False,
+        },
+        'apical-synapses': {
+            'capture?': True,
+            'only-active?': False,
+            'only-connected?': False,
+            'only-noteworthy-columns?': False,
+        },
+    }
+    runner = SanityRunner(sanityModel,
+                          captureOptions=captureOptions,
+                          startSimThread=False)
     runner.start(useBackgroundThread=True)
     simulation = runner.simulation
     computeMethod = etm.compute
@@ -233,7 +255,29 @@ class TMSanityModelPatched(TemporalMemorySanityModel):
 
 def patchTM(tm):
     sanityModel = TMSanityModelPatched(tm)
-    runner = SanityRunner(sanityModel, startSimThread=False)
+    captureOptions = {
+        'keep-steps': 2000,
+        'ff-synapses': {
+            'capture?': True,
+            'only-active?': False,
+            'only-connected?': False,
+        },
+        'distal-synapses': {
+            'capture?': True,
+            'only-active?': False,
+            'only-connected?': False,
+            'only-noteworthy-columns?': False,
+        },
+        'apical-synapses': {
+            'capture?': True,
+            'only-active?': False,
+            'only-connected?': False,
+            'only-noteworthy-columns?': False,
+        },
+    }
+    runner = SanityRunner(sanityModel,
+                          captureOptions=captureOptions,
+                          startSimThread=False)
     runner.start(useBackgroundThread=True)
     simulation = runner.simulation
     computeMethod = tm.compute

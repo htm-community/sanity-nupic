@@ -78,32 +78,36 @@ def parseSegmentSelector(segSelector):
     return columnGate
 
 class Journal(object):
-    def __init__(self, sanityModel):
+    def __init__(self, sanityModel, captureOptions=None):
         self.journal = []
         self.subscribers = []
         self.nextSnapshotId = 0
-        # The captureOptions and networkShape are shared with the client.
-        # Use hyphenated keys for these public formats.
-        self.captureOptions = {
-            'keep-steps': 50,
-            'ff-synapses': {
-                'capture?': False,
-                'only-active?': True,
-                'only-connected?': True,
-            },
-            'distal-synapses': {
-                'capture?': False,
-                'only-active?': True,
-                'only-connected?': True,
-                'only-noteworthy-columns?': True,
-            },
-            'apical-synapses': {
-                'capture?': False,
-                'only-active?': True,
-                'only-connected?': True,
-                'only-noteworthy-columns?': True,
-            },
-        }
+
+        if captureOptions is not None:
+            self.captureOptions = captureOptions
+        else:
+            # The captureOptions and networkShape are shared with the client.
+            # Use hyphenated keys for these public formats.
+            self.captureOptions = {
+                'keep-steps': 50,
+                'ff-synapses': {
+                    'capture?': False,
+                    'only-active?': True,
+                    'only-connected?': True,
+                },
+                'distal-synapses': {
+                    'capture?': False,
+                    'only-active?': True,
+                    'only-connected?': True,
+                    'only-noteworthy-columns?': True,
+                },
+                'apical-synapses': {
+                    'capture?': False,
+                    'only-active?': True,
+                    'only-connected?': True,
+                    'only-noteworthy-columns?': True,
+                },
+            }
 
         networkLayout = sanityModel.query(self.getBitHistory, getNetworkLayout=True)
         self.networkShape = {
