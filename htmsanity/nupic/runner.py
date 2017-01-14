@@ -16,7 +16,7 @@ from simulation import Simulation
 from journal import Journal
 from model import (CLASanityModel, TemporalMemorySanityModel,
                    SMTMSequenceSanityModel, SMTMExternalSanityModel,
-                   ExtendedTemporalMemorySanityModel)
+                   ExtendedTemporalMemorySanityModel, SPTMModel)
 from websocket import makeSanityWebSocketClass
 
 PAGE = """
@@ -123,6 +123,89 @@ class SanityRunner(object):
             t.start()
         else:
             reactor.run()
+
+
+class SPTMInstance(object):
+    """
+    Rather that patching a model class, treat Sanity as a logger.
+
+    This implementation is a quick hack.
+    """
+
+    def __init__(self, sp, tm, captureOverrides={}):
+        self.sanityModel = SPTMModel(sp, tm)
+        captureOptions = {
+            'keep-steps': 2000,
+            'ff-synapses': {
+                'capture?': True,
+                'only-active?': False,
+                'only-connected?': False,
+            },
+            'distal-synapses': {
+                'capture?': True,
+                'only-active?': False,
+                'only-connected?': False,
+                'only-noteworthy-columns?': False,
+            },
+            'apical-synapses': {
+                'capture?': False,
+                'only-active?': False,
+                'only-connected?': False,
+                'only-noteworthy-columns?': False,
+            },
+        }
+
+        for k, v in captureOverrides.iteritems():
+            if isinstance(v, collections.Mapping):
+                for k2, v2 in v.iteritems():
+                    captureOptions[k1][k2] = v2
+            else:
+                captureOptions[k] = v
+
+        self.runner = SanityRunner(
+            self.sanityModel, captureOptions=captureOptions,
+            startSimThread=False)
+        self.runner.start(useBackgroundThread=True, selectedTab="drawing")
+        self.simulation = self.runner.simulation
+
+
+    def waitForUserContinue(self):
+        while True:
+            if self.simulation.nStepsQueued > 0:
+                shouldGo = True
+                self.simulation.nStepsQueued -= 1
+            else:
+                shouldGo = self.simulation.isGoing
+
+            if shouldGo:
+                return
+            else:
+                # Having a timeout makes it receptive to ctrl+c...
+                self.simulation.checkStatusEvent.wait(999999)
+                self.simulation.checkStatusEvent.clear()
+
+
+    def appendTimestep(self, activeInputs, activeColumns, predictedCells,
+                       inputDisplayText=""):
+        """
+        @param activeInputs (sequence)
+        Indices of active input bits
+
+        @param activeColumns (sequence)
+        Indices of active minicolumns
+
+        @param predictedCells (sequence)
+        Indices of cells that were predicted for this timestep (not for the next
+        timestep)
+
+        @param inputDisplayText (string or dict)
+        """
+        self.sanityModel.inputDisplayText = inputDisplayText
+        self.sanityModel.activeInputs = activeInputs
+        self.sanityModel.activeColumns = activeColumns
+        self.sanityModel.predictedCells = predictedCells
+        self.sanityModel.onStepped()
+
 
 class CLASanityModelPatched(CLASanityModel):
     def __init__(self, model):
