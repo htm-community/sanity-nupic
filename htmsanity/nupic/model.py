@@ -239,6 +239,7 @@ def proximalSegmentsFromSP(sp, activeBits, onlyActiveSynapses, onlyConnectedSyna
             disconnectedMask = potentialMask & ~connectedMask
             if onlyActiveSynapses:
                 disconnectedMask = disconnectedMask & activeMask
+            inactiveConnectedMask = ~activeMask & potentialMask & connectedMask
             disconnectedSyns = [(inputBit, synapsePermanences[inputBit])
                                 for inputBit in inactiveConnectedMask.nonzero()[0]]
 
