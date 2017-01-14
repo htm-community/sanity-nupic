@@ -165,7 +165,7 @@ class SPTMInstance(object):
         self.runner = SanityRunner(
             self.sanityModel, captureOptions=captureOptions,
             startSimThread=False)
-        self.runner.start(useBackgroundThread=True, selectedTab="drawing")
+        self.runner.start(useBackgroundThread=True, selectedTab="capture")
         self.simulation = self.runner.simulation
 
 
