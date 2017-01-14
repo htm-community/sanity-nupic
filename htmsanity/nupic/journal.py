@@ -155,9 +155,12 @@ class Journal(object):
                     ret['regions'][regionName][layerName] = {
                         'activeCells': layerData['activeCells'],
                         'activeColumns': layerData['activeColumns'],
-                        'predictedCells': layerData['predictedCells'],
-                        'predictedColumns': layerData['predictedColumns'],
                     }
+
+                    for k in ('predictedCells', 'predictedColumns',
+                              'predictiveCells', 'predictiveColumns'):
+                        if k in layerData:
+                            ret['regions'][regionName][layerName][k] = layerData[k]
 
             yield ret
 
@@ -205,6 +208,7 @@ class Journal(object):
             })
 
         modelData = sanityModel.query(**queryArgs)
+
         self.journal.append(modelData)
 
         # TODO: only keep nKeepSteps models
@@ -319,12 +323,16 @@ class Journal(object):
         elif command == 'get-layer-stats':
             snapshotId, rgnId, lyrId, fetches, responseChannelMarshal = args
 
-            if snapshotId > 0:
+            modelData = self.journal[snapshotId]
+            layerData = modelData['regions'][rgnId][lyrId]
+            if 'predictedColumns' in layerData:
+                predictedColumns = set(layerData['predictedColumns'])
+            elif snapshotId > 0:
                 prevModelData = self.journal[snapshotId - 1]
                 prevLayerData = prevModelData['regions'][rgnId][lyrId]
-                prevPredColumns = prevLayerData['predictedColumns']
+                predictedColumns = prevLayerData['predictiveColumns']
             else:
-                prevPredColumns = set()
+                predictedColumns = set()
 
             modelData = self.journal[snapshotId]
             layerData = modelData['regions'][rgnId][lyrId]
@@ -333,13 +341,13 @@ class Journal(object):
             ret = {}
 
             if 'n-unpredicted-active-columns' in fetches:
-                ret['n-unpredicted-active-columns'] = len(activeColumns - prevPredColumns)
+                ret['n-unpredicted-active-columns'] = len(activeColumns - predictedColumns)
 
             if 'n-predicted-inactive-columns' in fetches:
-                ret['n-predicted-inactive-columns'] = len(prevPredColumns - activeColumns)
+                ret['n-predicted-inactive-columns'] = len(predictedColumns - activeColumns)
 
             if 'n-predicted-active-columns' in fetches:
-                ret['n-predicted-active-columns'] = len(activeColumns & prevPredColumns)
+                ret['n-predicted-active-columns'] = len(activeColumns & predictedColumns)
 
             responseChannelMarshal.ch.put(ret)
 
@@ -394,14 +402,20 @@ class Journal(object):
                                    if (cellId >= firstCellInCol and
                                        cellId < firstCellInCol + cellsPerColumn))
             predictedCellsInCol = []
-            if snapshotId > 0:
+
+            if 'predictedCells' in layerData:
+                predictedCells = set(layerData['predictedCells'])
+            elif snapshotId > 0:
                 prevModelData = self.journal[snapshotId - 1]
                 prevLayerData = prevModelData['regions'][rgnId][lyrId]
-                predictedCellsInCol = set(cellId - firstCellInCol
-                                          for cellId in prevLayerData['predictedCells']
-                                          if (cellId >= firstCellInCol and
-                                              cellId < firstCellInCol + cellsPerColumn))
+                predictedCells = prevLayerData['predictiveCells']
+            else:
+                predictedCells = set()
 
+            predictedCellsInCol = set(cellId - firstCellInCol
+                                      for cellId in predictedCells
+                                      if (cellId >= firstCellInCol and
+                                          cellId < firstCellInCol + cellsPerColumn))
             ret = {}
 
             if 'active-cells' in fetches:
@@ -415,15 +429,18 @@ class Journal(object):
         elif command == 'get-layer-bits':
             snapshotId, rgnId, lyrId, fetches, cachedOnscreenBits, responseChannelMarshal = args
 
+            layerData = self.journal[snapshotId]['regions'][rgnId][lyrId]
+
             ret = {}
             if 'active-columns' in fetches:
-                layerData = self.journal[snapshotId]['regions'][rgnId][lyrId]
                 ret['active-columns'] = layerData['activeColumns']
 
             if 'pred-columns' in fetches:
-                if snapshotId > 0:
+                if 'predictedColumns' in layerData:
+                    ret['pred-columns'] = layerData['predictedColumns']
+                elif snapshotId > 0:
                     prevLayerData = self.journal[snapshotId - 1]['regions'][rgnId][lyrId]
-                    ret['pred-columns'] = prevLayerData['predictedColumns']
+                    ret['pred-columns'] = prevLayerData['predictiveColumns']
 
             responseChannelMarshal.ch.put(ret)
 

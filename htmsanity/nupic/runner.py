@@ -15,6 +15,7 @@ import marshalling as marshal
 from simulation import Simulation
 from journal import Journal
 from model import (CLASanityModel, TemporalMemorySanityModel,
+                   SMTMSequenceSanityModel, SMTMExternalSanityModel,
                    ExtendedTemporalMemorySanityModel)
 from websocket import makeSanityWebSocketClass
 
@@ -148,7 +149,7 @@ def patchCLAModel(model):
     runner.start(useBackgroundThread=True)
     simulation = runner.simulation
     runMethod = model.run
-    def myRun(v):
+    def myRun(v, *args, **kwargs):
         while True:
             if simulation.nStepsQueued > 0:
                 shouldGo = True
@@ -157,7 +158,7 @@ def patchCLAModel(model):
                 shouldGo = simulation.isGoing
 
             if shouldGo:
-                ret = runMethod(v)
+                ret = runMethod(v, *args, **kwargs)
                 sanityModel.lastInput = v
                 sanityModel.onStepped()
                 return ret
@@ -207,13 +208,23 @@ def patchETM(etm):
                           startSimThread=False)
     runner.start(useBackgroundThread=True, selectedTab="drawing")
     simulation = runner.simulation
-    computeMethod = etm.compute
 
-    def myCompute(activeColumns,
-                  activeExternalCells=None,
-                  activeApicalCells=None,
-                  formInternalConnections=True,
-                  learn=True):
+    depolarizeCellsMethod = etm.depolarizeCells
+
+    def myDepolarizeCells(activeCellsExternalBasal=(),
+                          activeCellsExternalApical=(), *args, **kwargs):
+        sanityModel.activeExternalCellsBasal = activeCellsExternalBasal
+        sanityModel.activeExternalCellsApical = activeCellsExternalApical
+        depolarizeCellsMethod(activeCellsExternalBasal,
+                              activeCellsExternalApical,
+                              *args, **kwargs)
+
+    etm.depolarizeCells = myDepolarizeCells
+
+
+    activateCellsMethod = etm.activateCells
+
+    def myActivateCells(activeColumns, *args, **kwargs):
         while True:
             if simulation.nStepsQueued > 0:
                 shouldGo = True
@@ -222,18 +233,8 @@ def patchETM(etm):
                 shouldGo = simulation.isGoing
 
             if shouldGo:
-                computeMethod(activeColumns,
-                              activeExternalCells,
-                              activeApicalCells,
-                              formInternalConnections,
-                              learn)
+                activateCellsMethod(activeColumns, *args, **kwargs)
                 sanityModel.activeColumns = activeColumns
-                sanityModel.activeExternalCellsBasal = (activeExternalCells
-                                                        if activeExternalCells is not None
-                                                        else [])
-                sanityModel.activeExternalCellsApical = (activeApicalCells
-                                                         if activeApicalCells is not None
-                                                         else [])
                 sanityModel.onStepped()
                 return
             else:
@@ -241,7 +242,7 @@ def patchETM(etm):
                 simulation.checkStatusEvent.wait(999999)
                 simulation.checkStatusEvent.clear()
 
-    etm.compute = myCompute
+    etm.activateCells = myActivateCells
 
 
 class TMSanityModelPatched(TemporalMemorySanityModel):
@@ -284,8 +285,7 @@ def patchTM(tm):
     simulation = runner.simulation
     computeMethod = tm.compute
 
-    def myCompute(activeColumns,
-                  learn=True):
+    def myCompute(activeColumns, *args, **kwargs):
         while True:
             if simulation.nStepsQueued > 0:
                 shouldGo = True
@@ -294,8 +294,136 @@ def patchTM(tm):
                 shouldGo = simulation.isGoing
 
             if shouldGo:
-                computeMethod(activeColumns,
-                              learn)
+                computeMethod(activeColumns, *args, **kwargs)
+                sanityModel.activeColumns = activeColumns
+                sanityModel.onStepped()
+                return
+            else:
+                # Having a timeout makes it receptive to ctrl+c...
+                simulation.checkStatusEvent.wait(999999)
+                simulation.checkStatusEvent.clear()
+
+    tm.compute = myCompute
+
+
+class SMTMSequenceSanityModelPatched(SMTMSequenceSanityModel):
+    def __init__(self, model):
+        super(SMTMSequenceSanityModelPatched, self).__init__(model)
+
+    def step(self):
+        assert False
+
+    def getInputDisplayText(self):
+        return ""
+
+
+def patchSMTM_SequenceMemory(tm):
+    sanityModel = SMTMSequenceSanityModelPatched(tm)
+    captureOptions = {
+        'keep-steps': 2000,
+        'ff-synapses': {
+            'capture?': True,
+            'only-active?': False,
+            'only-connected?': False,
+        },
+        'distal-synapses': {
+            'capture?': True,
+            'only-active?': False,
+            'only-connected?': False,
+            'only-noteworthy-columns?': False,
+        },
+        'apical-synapses': {
+            'capture?': True,
+            'only-active?': False,
+            'only-connected?': False,
+            'only-noteworthy-columns?': False,
+        },
+    }
+    runner = SanityRunner(sanityModel,
+                          captureOptions=captureOptions,
+                          startSimThread=False)
+    runner.start(useBackgroundThread=True, selectedTab="drawing")
+    simulation = runner.simulation
+    computeMethod = tm.compute
+
+    def myCompute(activeColumns, *args, **kwargs):
+        while True:
+            if simulation.nStepsQueued > 0:
+                shouldGo = True
+                simulation.nStepsQueued -= 1
+            else:
+                shouldGo = simulation.isGoing
+
+            if shouldGo:
+                computeMethod(activeColumns, *args, **kwargs)
+                sanityModel.activeColumns = activeColumns
+                sanityModel.onStepped()
+                return
+            else:
+                # Having a timeout makes it receptive to ctrl+c...
+                simulation.checkStatusEvent.wait(999999)
+                simulation.checkStatusEvent.clear()
+
+    tm.compute = myCompute
+
+
+
+
+class SMTMExternalSanityModelPatched(SMTMExternalSanityModel):
+    def __init__(self, model):
+        super(SMTMExternalSanityModelPatched, self).__init__(model)
+
+    def step(self):
+        assert False
+
+    def getInputDisplayText(self):
+        return ""
+
+
+
+def patchSMTM_ExternalInput(tm):
+    sanityModel = SMTMExternalSanityModelPatched(tm)
+    captureOptions = {
+        'keep-steps': 2000,
+        'ff-synapses': {
+            'capture?': True,
+            'only-active?': False,
+            'only-connected?': False,
+        },
+        'distal-synapses': {
+            'capture?': True,
+            'only-active?': False,
+            'only-connected?': False,
+            'only-noteworthy-columns?': False,
+        },
+        'apical-synapses': {
+            'capture?': True,
+            'only-active?': False,
+            'only-connected?': False,
+            'only-noteworthy-columns?': False,
+        },
+    }
+    runner = SanityRunner(sanityModel, captureOptions=captureOptions,
+                          startSimThread=False)
+    runner.start(useBackgroundThread=True, selectedTab="drawing")
+    simulation = runner.simulation
+    computeMethod = tm.compute
+
+    def myCompute(activeColumns, basalInput, basalGrowthCandidates, apicalInput,
+                  apicalGrowthCandidates, *args, **kwargs):
+        sanityModel.activeExternalCellsBasal = basalInput
+        sanityModel.activeExternalCellsApical = apicalInput
+        while True:
+            if simulation.nStepsQueued > 0:
+                shouldGo = True
+                simulation.nStepsQueued -= 1
+            else:
+                shouldGo = simulation.isGoing
+
+            if shouldGo:
+                computeMethod(activeColumns, basalInput, basalGrowthCandidates,
+                              apicalInput, apicalGrowthCandidates, *args,
+                              **kwargs)
                 sanityModel.activeColumns = activeColumns
                 sanityModel.onStepped()
                 return

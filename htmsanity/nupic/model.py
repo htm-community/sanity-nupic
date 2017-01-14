@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from collections import deque
 
-import numpy
+import numpy as np
 from nupic.bindings.math import GetNTAReal
 
 class SanityModel(object):
@@ -211,9 +211,9 @@ class SanityModel(object):
 def proximalSegmentsFromSP(sp, activeBits, onlyActiveSynapses, onlyConnectedSynapses, sourcePath):
     segsByColCell = {}
     synPermConnected = sp.getSynPermConnected()
-    synapsePotentials = numpy.zeros(sp.getNumInputs()).astype('uint32')
-    synapsePermanences = numpy.zeros(sp.getNumInputs()).astype(GetNTAReal())
-    activeMask = numpy.zeros(sp.getNumInputs(), dtype=bool)
+    synapsePotentials = np.zeros(sp.getNumInputs()).astype('uint32')
+    synapsePermanences = np.zeros(sp.getNumInputs()).astype(GetNTAReal())
+    activeMask = np.zeros(sp.getNumInputs(), dtype=bool)
     activeMask[list(activeBits)] = True
     for column in range(sp.getNumColumns()):
         segsByColCell[column] = {}
@@ -506,9 +506,9 @@ class CLASanityModel(SanityModel):
             regions['rgn-0']['layer-3'].update({
                 "activeColumns": set(spOutput.nonzero()[0].tolist()),
                 "activeCells": set(tp.getActiveState().nonzero()[0].tolist()),
-                "predictedCells": set(npPredictedCells.tolist()),
-                "predictedColumns": set(numpy.unique(npPredictedCells /
-                                                     tp.cellsPerColumn).tolist()),
+                "predictiveCells": set(npPredictedCells.tolist()),
+                "predictiveColumns": set(np.unique(npPredictedCells /
+                                                   tp.cellsPerColumn).tolist()),
             })
 
         if getProximalSegments:
@@ -531,7 +531,7 @@ class CLASanityModel(SanityModel):
             try:
                 prevState = bitHistory.next()
                 columnsToCheck = (regions['rgn-0']['layer-3']['activeColumns'] |
-                                  prevState['regions']['rgn-0']['layer-3']['predictedColumns'])
+                                  prevState['regions']['rgn-0']['layer-3']['predictiveColumns'])
                 onlySources = prevState['regions']['rgn-0']['layer-3']['activeCells']
                 sourcePath = ('regions', 'rgn-0', 'layer-3')
                 onlyActiveSynapses = distalSegmentsQuery['onlyActiveSynapses']
@@ -650,7 +650,7 @@ class ExtendedTemporalMemorySanityModel(SanityModel):
                     ]
                     onlyActiveSynapses = distalSegmentsQuery['onlyActiveSynapses']
                     onlyConnectedSynapses = distalSegmentsQuery['onlyConnectedSynapses']
-                    distalSegments = segmentsFromConnections2(tm.connections, tm,
+                    distalSegments = segmentsFromConnections2(tm.basalConnections, tm,
                                                               columnsToCheck, activeBits,
                                                               onlyActiveSynapses,
                                                               onlyConnectedSynapses,
@@ -734,8 +734,8 @@ class TemporalMemorySanityModel(SanityModel):
             regions['tm']['layer'].update({
                 'activeColumns': set(self.activeColumns),
                 'activeCells': set(tm.getActiveCells()),
-                'predictedCells': predictiveCells,
-                'predictedColumns': predictiveColumns,
+                'predictiveCells': predictiveCells,
+                'predictiveColumns': predictiveColumns,
             })
 
         if getDistalSegments:
@@ -745,7 +745,7 @@ class TemporalMemorySanityModel(SanityModel):
 
                 if distalSegmentsQuery['onlyNoteworthyColumns']:
                     columnsToCheck = (regions['tm']['layer']['activeColumns'] |
-                                      prevState['regions']['tm']['layer']['predictedColumns'])
+                                      prevState['regions']['tm']['layer']['predictiveColumns'])
                 else:
                     columnsToCheck = xrange(self.tm.numberOfColumns())
 
@@ -767,6 +767,290 @@ class TemporalMemorySanityModel(SanityModel):
                     "nDistalLearningThreshold": tm.getMinThreshold(),
                     "nDistalStimulusThreshold": tm.getActivationThreshold(),
                 })
+            except StopIteration:
+                # No previous timestep available.
+                pass
+
+        return {
+            'senses': senses,
+            'regions': regions,
+        }
+
+
+def segmentsFromSegmentSparseMatrix(
+        connections, tm, onlyColumns, activeBits,
+        onlyActiveSynapses, onlyConnectedSynapses, inputsAndWidths):
+    segsByColCell = {}
+    for col in onlyColumns:
+        segsByColCell[col] = {}
+        for cell in range(tm.cellsPerColumn):
+            segs = []
+            for seg in connections.getSegmentsForCell(col * tm.cellsPerColumn + cell):
+                nConnectedActive = 0
+                nConnectedTotal = 0
+                nDisconnectedActive = 0
+                nDisconnectedTotal = 0
+                synapsesBySource = {}
+
+                row = connections.matrix.getRow(seg)
+                presynapticCells = np.flatnonzero(row)
+
+                offset = 0
+                synapseIdx = 0
+                for sourcePath, width in inputsAndWidths:
+                    activeSynapses = deque()
+                    inactiveSynapses = deque()
+                    disconnectedSynapses = deque()
+                    while (synapseIdx < len(presynapticCells) and
+                           presynapticCells[synapseIdx] < offset + width):
+                        presynapticCell = presynapticCells[synapseIdx]
+                        permanence = row[presynapticCell]
+
+                        isConnected = permanence >= tm.connectedPermanence
+                        isActive = presynapticCell in activeBits
+
+                        if isConnected:
+                            nConnectedTotal += 1
+                        else:
+                            nDisconnectedTotal += 1
+
+                        if isActive:
+                            if isConnected:
+                                nConnectedActive += 1
+                            else:
+                                nDisconnectedActive += 1
+
+                        synapseList = None
+                        if isActive and isConnected:
+                            synapseList = activeSynapses
+                        elif isConnected:
+                            if not onlyActiveSynapses:
+                                synapseList = inactiveSynapses
+                        else:
+                            if not onlyConnectedSynapses:
+                                synapseList = disconnectedSynapses
+
+                        if synapseList is not None:
+                            syn = (presynapticCell - offset, permanence)
+                            synapseList.append(syn)
+
+                        synapseIdx += 1
+
+                    synapsesBySource[sourcePath] = {
+                        'active': activeSynapses,
+                        'inactive-syn': inactiveSynapses,
+                        'disconnected': disconnectedSynapses,
+                    }
+                    offset += width
+
+                segs.append({
+                    "synapses": synapsesBySource,
+                    "nConnectedActive": nConnectedActive,
+                    "nConnectedTotal": nConnectedTotal,
+                    "nDisconnectedActive": nDisconnectedActive,
+                    "nDisconnectedTotal": nDisconnectedTotal,
+                })
+            segsByColCell[col][cell] = segs
+
+    return segsByColCell
+
+
+
+class SMTMSequenceSanityModel(SanityModel):
+    def __init__(self, tm):
+        super(SMTMSequenceSanityModel, self).__init__()
+        self.tm = tm
+        self.activeColumns = []
+        self.activeExternalCellsBasal = []
+        self.activeExternalCellsApical = []
+
+    def query(self, bitHistory, getNetworkLayout=False, getBitStates=False,
+              getProximalSegments=False, proximalSegmentsQuery={},
+              getDistalSegments=False, distalSegmentsQuery={},
+              getApicalSegments=False, apicalSegmentsQuery={}):
+        tm = self.tm
+
+        senses = {
+        }
+        regions = {
+            'tm': {'layer': {}},
+        }
+
+        if getNetworkLayout:
+            regions['tm']['layer'].update({
+                'cellsPerColumn': tm.cellsPerColumn,
+                'dimensions': (tm.numColumns,),
+                'ordinal': 1,
+            })
+
+        if getBitStates:
+            predictedCells = tm.getPreviouslyPredictedCells()
+            regions['tm']['layer'].update({
+                'activeColumns': set(self.activeColumns),
+                'activeCells': set(tm.activeCells),
+                'predictedCells': set(predictedCells),
+                'predictedColumns': set(predictedCells / tm.cellsPerColumn),
+            })
+
+        if getDistalSegments:
+            assert getBitStates
+            try:
+                prevState = bitHistory.next()
+
+                if distalSegmentsQuery['onlyNoteworthyColumns']:
+                    columnsToCheck = (regions['tm']['layer']['activeColumns'] |
+                                      prevState['regions']['tm']['layer']['predictedColumns'])
+                else:
+                    columnsToCheck = xrange(self.tm.numColumns)
+
+                activeBits = prevState['regions']['tm']['layer']['activeCells']
+
+                sourcePath = ('regions', 'tm', 'layer')
+                inputsAndWidths = [
+                    (('regions', 'tm', 'layer'), tm.numColumns * tm.cellsPerColumn),
+                ]
+                onlyActiveSynapses = distalSegmentsQuery['onlyActiveSynapses']
+                onlyConnectedSynapses = distalSegmentsQuery['onlyConnectedSynapses']
+                distalSegments = segmentsFromSegmentSparseMatrix(
+                    tm.basalConnections, tm,
+                    columnsToCheck, activeBits,
+                    onlyActiveSynapses,
+                    onlyConnectedSynapses,
+                    inputsAndWidths)
+                regions['tm']['layer'].update({
+                    'distalSegments': distalSegments,
+                    "nDistalLearningThreshold": tm.minThreshold,
+                    "nDistalStimulusThreshold": tm.activationThreshold,
+                })
+            except StopIteration:
+                # No previous timestep available.
+                pass
+
+        return {
+            'senses': senses,
+            'regions': regions,
+        }
+
+
+
+class SMTMExternalSanityModel(SanityModel):
+    def __init__(self, etm):
+        super(SMTMExternalSanityModel, self).__init__()
+        self.tm = etm
+        self.activeColumns = []
+        self.activeExternalCellsBasal = []
+        self.activeExternalCellsApical = []
+
+    def query(self, bitHistory, getNetworkLayout=False, getBitStates=False,
+              getProximalSegments=False, proximalSegmentsQuery={},
+              getDistalSegments=False, distalSegmentsQuery={},
+              getApicalSegments=False, apicalSegmentsQuery={}):
+        tm = self.tm
+
+        senses = {
+            'external': {}
+        }
+        regions = {
+            'tm': {'layer': {}},
+            'higher': {'layer': {}},
+        }
+
+        if getNetworkLayout:
+            senses['external'].update({
+                'dimensions': tm.basalInputDimensions,
+                'ordinal': 0,
+            })
+
+            regions['tm']['layer'].update({
+                'cellsPerColumn': tm.cellsPerColumn,
+                'dimensions': tm.columnDimensions,
+                'ordinal': 1,
+            })
+
+            regions['higher']['layer'].update({
+                'cellsPerColumn': 1,
+                'dimensions': tm.apicalInputDimensions,
+                'ordinal': 2,
+            })
+
+        if getBitStates:
+            senses['external'].update({
+                'activeBits': set(self.activeExternalCellsBasal)
+            })
+
+            predictedCells = set(tm.getPreviouslyPredictedCells())
+            predictedColumns = set(cell / tm.cellsPerColumn for cell in predictedCells)
+            regions['tm']['layer'].update({
+                'activeColumns': set(self.activeColumns),
+                'activeCells': set(tm.getActiveCells()),
+                'predictedCells': predictedCells,
+                'predictedColumns': predictedColumns,
+            })
+
+            regions['higher']['layer'].update({
+                'activeColumns': set(self.activeExternalCellsApical),
+                'activeCells': set(self.activeExternalCellsApical),
+                'predictedCells': set(),
+                'predictedColumns': set(),
+            })
+
+        if getDistalSegments or getApicalSegments:
+            assert getBitStates
+            try:
+                prevState = bitHistory.next()
+
+                if getDistalSegments:
+                    if distalSegmentsQuery['onlyNoteworthyColumns']:
+                        columnsToCheck = (regions['tm']['layer']['activeColumns'] |
+                                          prevState['regions']['tm']['layer']['predictedColumns'])
+                    else:
+                        columnsToCheck = xrange(self.tm.numColumns)
+
+                    activeBits = senses['external']['activeBits']
+
+                    inputsAndWidths = [
+                        (('senses', 'external'), tm.basalConnections.matrix.nCols()),
+                    ]
+                    onlyActiveSynapses = distalSegmentsQuery['onlyActiveSynapses']
+                    onlyConnectedSynapses = distalSegmentsQuery['onlyConnectedSynapses']
+                    distalSegments = segmentsFromSegmentSparseMatrix(
+                        tm.basalConnections, tm,
+                        columnsToCheck, activeBits,
+                        onlyActiveSynapses,
+                        onlyConnectedSynapses,
+                        inputsAndWidths)
+                    regions['tm']['layer'].update({
+                        'distalSegments': distalSegments,
+                        "nDistalLearningThreshold": tm.minThreshold,
+                        "nDistalStimulusThreshold": tm.activationThreshold,
+                    })
+                if getApicalSegments:
+                    if apicalSegmentsQuery['onlyNoteworthyColumns']:
+                        columnsToCheck = (regions['tm']['layer']['activeColumns'] |
+                                          prevState['regions']['tm']['layer']['predictedColumns'])
+                    else:
+                        columnsToCheck = xrange(self.tm.numColumns)
+
+                    activeBits = regions['higher']['layer']['activeCells']
+
+                    sourceCellsPerColumn = 1
+                    inputsAndWidths = [
+                        (('regions', 'higher', 'layer'), tm.apicalConnections.matrix.nCols()),
+                    ]
+                    sourceCellOffset = -tm.numColumns * tm.cellsPerColumn
+                    onlyActiveSynapses = apicalSegmentsQuery['onlyActiveSynapses']
+                    onlyConnectedSynapses = apicalSegmentsQuery['onlyConnectedSynapses']
+                    apicalSegments = segmentsFromSegmentSparseMatrix(
+                        tm.apicalConnections, tm,
+                        columnsToCheck, activeBits,
+                        onlyActiveSynapses,
+                        onlyConnectedSynapses,
+                        inputsAndWidths)
+                    regions['tm']['layer'].update({
+                        'apicalSegments': apicalSegments,
+                        "nApicalLearningThreshold": tm.minThreshold,
+                        "nApicalStimulusThreshold": tm.activationThreshold,
+                    })
             except StopIteration:
                 # No previous timestep available.
                 pass

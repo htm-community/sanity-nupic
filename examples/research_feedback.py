@@ -4,14 +4,13 @@ from collections import deque
 from nupic.data.generators.pattern_machine import PatternMachine
 from nupic.data.generators.sequence_machine import SequenceMachine
 from htmresearch.algorithms.extended_temporal_memory import ExtendedTemporalMemory
-from nupic.research.monitor_mixin.temporal_memory_monitor_mixin import (
-    TemporalMemoryMonitorMixin)
+from htmresearch.support.etm_monitor_mixin import ExtendedTemporalMemoryMonitorMixin
 
 from htmsanity.nupic.runner import SanityRunner
 from htmsanity.nupic.model import SanityModel, segmentsFromConnections
 
-class MonitoredExtendedTemporalMemory(TemporalMemoryMonitorMixin,
-                                     ExtendedTemporalMemory):
+class MonitoredExtendedTemporalMemory(ExtendedTemporalMemoryMonitorMixin,
+                                      ExtendedTemporalMemory):
     pass
 
 DEFAULT_TEMPORAL_MEMORY_PARAMS = {
@@ -26,6 +25,7 @@ DEFAULT_TEMPORAL_MEMORY_PARAMS = {
     "permanenceDecrement": 0.02,
     "predictedSegmentDecrement": 0.08,
     "seed": 42,
+    "apicalInputDimensions": (2048,),
     "learnOnOneCell": False}
 
 def generateSequences(patternDimensionality, patternCardinality, sequenceLength,
@@ -37,7 +37,8 @@ def generateSequences(patternDimensionality, patternCardinality, sequenceLength,
     numbers = sequenceMachine.generateNumbers(sequenceCount, sequenceLength)
     generatedSequences = sequenceMachine.generateFromNumbers(numbers)
 
-    return generatedSequences
+    return [sorted(s) if s is not None else None
+            for s in generatedSequences]
 
 def serializePattern(patternSet):
     return ','.join(sorted([str(x) for x in patternSet]))
@@ -75,7 +76,7 @@ def shiftingFeedback(starting_feedback, n, percent_shift=0.2):
         toRemove = set(random.sample(feedback, p))
         toAdd = set([random.randint(0, 2047) for _ in range(p)])
         feedback = (feedback - toRemove) | toAdd
-        feedback_seq.append(feedback)
+        feedback_seq.append(sorted(feedback))
 
     return feedback_seq
 
@@ -131,12 +132,15 @@ class FeedbackExperimentSanityModel(SanityModel):
             else:
                 feedback = None
                 if trial < self.feedbackBuffer:
-                    feedback = set([random.randint(0, 2048)
-                                    for _ in range(self.nFeedbackActive)])
+                    feedback = sorted(set([random.randint(0, 2047)
+                                           for _ in range(self.nFeedbackActive)]))
                 else:
                     feedback = self.trainFeedbackSeq[i]
-                self.tm.compute(pattern, activeApicalCells=feedback,
-                                learn=True, sequenceLabel=None)
+
+                self.tm.compute(pattern, activeCellsExternalApical=feedback,
+                                reinforceCandidatesExternalApical=feedback,
+                                growthCandidatesExternalApical=feedback,
+                                learn=True)
         elif self.lastInputIndex < trainDuration + len(self.testSeq):
             i = self.lastInputIndex - trainDuration
 
@@ -225,11 +229,11 @@ class FeedbackExperimentSanityModel(SanityModel):
                 if self.lastInputIndex < trainDuration:
                     i = self.lastInputIndex % trialDuration
                     pattern = self.trainSeq[i]
-                    feedbackPattern = self.trainFeedbackSeq[i]
+                    feedbackPattern = set(self.trainFeedbackSeq[i])
                 elif self.lastInputIndex < trainDuration + len(self.testSeq):
                     i = self.lastInputIndex - trainDuration
                     pattern = self.testSeq[i]
-                    feedbackPattern = self.testFeedbackSeq[i]
+                    feedbackPattern = set(self.testFeedbackSeq[i])
                 else:
                     assert False
 
@@ -237,13 +241,13 @@ class FeedbackExperimentSanityModel(SanityModel):
             if pattern is not None:
                 activeBits = set(pattern)
 
-            predictiveCells = set(tm.predictiveCells)
+            predictiveCells = set(tm.getPredictiveCells())
             predictiveColumns = set(cell / tm.cellsPerColumn for cell in predictiveCells)
             regions['tm']['layer'].update({
                 'activeColumns': activeBits,
                 'activeCells': set(tm.activeCells),
-                'predictedCells': set(predictiveCells),
-                'predictedColumns': predictiveColumns,
+                'predictiveCells': set(predictiveCells),
+                'predictiveColumns': predictiveColumns,
             })
 
             activeFeedbackColumns = set()
@@ -253,8 +257,8 @@ class FeedbackExperimentSanityModel(SanityModel):
             regions['pseudo']['layer'].update({
                 'activeColumns': feedbackPattern,
                 'activeCells': feedbackPattern,
-                'predictedCells': set(),
-                'predictedColumns': set(),
+                'predictiveCells': set(),
+                'predictiveColumns': set(),
             })
 
         if getDistalSegments or getApicalSegments:
@@ -262,14 +266,14 @@ class FeedbackExperimentSanityModel(SanityModel):
             try:
                 prevState = bitHistory.next()
                 columnsToCheck = (regions['tm']['layer']['activeColumns'] |
-                                  prevState['regions']['tm']['layer']['predictedColumns'])
+                                  prevState['regions']['tm']['layer']['predictiveColumns'])
 
                 if getDistalSegments:
                     onlySources = prevState['regions']['tm']['layer']['activeCells']
                     sourcePath = ('regions', 'tm', 'layer')
                     onlyActiveSynapses = distalSegmentsQuery['onlyActiveSynapses']
                     onlyConnectedSynapses = distalSegmentsQuery['onlyConnectedSynapses']
-                    distalSegments = segmentsFromConnections(tm.connections, tm,
+                    distalSegments = segmentsFromConnections(tm.basalConnections, tm,
                                                              columnsToCheck, onlySources,
                                                              sourcePath,
                                                              onlyActiveSynapses,
@@ -327,12 +331,12 @@ def experiment2():
     # Create two sequences with format "ABCDE" and "XBCDF"
     sequences1 = generateSequences(2048, 40, 5, 1)
 
-    sequences2 = [x for x in sequences1]
-    sequences2[0] = set([random.randint(0, 2047) for _ in sequences1[0]])
-    sequences2[-2] = set([random.randint(0, 2047) for _ in sequences1[-2]])
+    sequences2 = list(sequences1)
+    sequences2[0] = sorted(set(random.randint(0, 2047) for _ in sequences1[0]))
+    sequences2[-2] = sorted(set(random.randint(0, 2047) for _ in sequences1[-2]))
 
-    fixed_feedback1 = set([random.randint(0, 2047) for _ in range(feedback_n)])
-    fixed_feedback2 = set([random.randint(0, 2047) for _ in range(feedback_n)])
+    fixed_feedback1 = sorted(set([random.randint(0, 2047) for _ in range(feedback_n)]))
+    fixed_feedback2 = sorted(set([random.randint(0, 2047) for _ in range(feedback_n)]))
     feedback_seq1 = shiftingFeedback(fixed_feedback1, len(sequences1))
     feedback_seq2 = shiftingFeedback(fixed_feedback2, len(sequences2))
 
