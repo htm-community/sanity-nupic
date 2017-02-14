@@ -6,6 +6,7 @@ import sys
 import threading
 import webbrowser
 import collections
+import time
 
 from autobahn.twisted.websocket import WebSocketServerFactory
 from twisted.internet import reactor
@@ -53,7 +54,7 @@ PAGE = """
   <script type="text/javascript" src="sanity/public/demos/out/sanity.js"></script>
   <script type="text/javascript">goog.require("org.numenta.sanity.demos.runner");</script>
   <script type="text/javascript">
-    org.numenta.sanity.demos.runner.init("NuPIC", "ws://localhost:%d", "%s", "capture", "drawing", "time-plots");
+    org.numenta.sanity.demos.runner.init("NuPIC", "ws://localhost:%d", "%s", "capture", "drawing", "time-plots", "speed");
   </script>
 </body>
 </html>
@@ -168,6 +169,8 @@ class SPTMInstance(object):
         self.runner.start(useBackgroundThread=True, selectedTab="capture")
         self.simulation = self.runner.simulation
 
+        self.prevStepTime = 0.0
+
 
     def waitForUserContinue(self):
         while True:
@@ -178,6 +181,14 @@ class SPTMInstance(object):
                 shouldGo = self.simulation.isGoing
 
             if shouldGo:
+                if self.simulation.stepTimeInSeconds > 0:
+                    discrepancy = (self.prevStepTime +
+                                   self.simulation.stepTimeInSeconds -
+                                   time.time())
+                    if discrepancy > 0:
+                        time.sleep(discrepancy)
+
+                self.prevStepTime = time.time()
                 return
             else:
                 # Having a timeout makes it receptive to ctrl+c...
@@ -492,10 +503,12 @@ def patchSMTM_ExternalInput(tm):
     simulation = runner.simulation
     computeMethod = tm.compute
 
+
     def myCompute(activeColumns, basalInput, basalGrowthCandidates, apicalInput,
                   apicalGrowthCandidates, *args, **kwargs):
         sanityModel.activeExternalCellsBasal = basalInput
         sanityModel.activeExternalCellsApical = apicalInput
+
         while True:
             if simulation.nStepsQueued > 0:
                 shouldGo = True

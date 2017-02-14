@@ -23,6 +23,7 @@ class Simulation(object):
         self.isGoing = False
         self.nStepsQueued = 0
         self.checkStatusEvent = threading.Event()
+        self.stepTimeInSeconds = 0.0
         if startSimThread:
             self.simThread = threading.Thread(target = simulationThread,
                                               args = (self, self.checkStatusEvent))
@@ -57,6 +58,9 @@ class Simulation(object):
             subscriberChannel = subscriberChannelMarshal.ch
             self.statusSubscribers.append(subscriberChannel)
             subscriberChannel.put([self.isGoing])
+        elif command == "set-step-ms":
+            stepMs, = args
+            self.stepTimeInSeconds = stepMs / 1000.0
         else:
             print "Unrecognized command! %s" % command
 
