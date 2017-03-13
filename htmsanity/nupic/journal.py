@@ -112,21 +112,20 @@ class Journal(object):
         networkLayout = sanityModel.query(self.getBitHistory, getNetworkLayout=True)
         self.networkShape = {
             'senses': {},
-            'regions': {},
+            'layers': {},
         }
         for senseId, sense in networkLayout['senses'].items():
             self.networkShape['senses'][senseId] = {
                 'ordinal': sense['ordinal'],
                 'dimensions': sense['dimensions'],
             }
-        for rgnId, rgn in networkLayout['regions'].items():
-            self.networkShape['regions'][rgnId] = {}
-            for lyrId, lyr in rgn.items():
-                self.networkShape['regions'][rgnId][lyrId] = {
-                    'ordinal': lyr['ordinal'],
-                    'cells-per-column': lyr['cellsPerColumn'],
-                    'dimensions': lyr['dimensions'],
-                }
+
+        for lyrId, layerData in networkLayout['layers'].items():
+            self.networkShape['layers'][lyrId] = {
+                'ordinal': layerData['ordinal'],
+                'cells-per-column': layerData['cellsPerColumn'],
+                'dimensions': layerData['dimensions'],
+            }
 
         self.append(sanityModel)
         sanityModel.addEventListener('didStep', lambda: self.append(sanityModel))
@@ -141,7 +140,7 @@ class Journal(object):
         for entry in reversed(self.journal):
             ret = {
                 'senses': {},
-                'regions': {},
+                'layers': {},
             }
 
             for senseName, senseData in entry['senses'].items():
@@ -149,18 +148,16 @@ class Journal(object):
                     'activeBits': senseData['activeBits'],
                 }
 
-            for regionName, regionData in entry['regions'].items():
-                ret['regions'][regionName] = {}
-                for layerName, layerData in regionData.items():
-                    ret['regions'][regionName][layerName] = {
-                        'activeCells': layerData['activeCells'],
-                        'activeColumns': layerData['activeColumns'],
-                    }
+            for lyrId, layerData in entry['layers'].items():
+                ret['layers'][lyrId] = {
+                    'activeCells': layerData['activeCells'],
+                    'activeColumns': layerData['activeColumns'],
+                }
 
-                    for k in ('predictedCells', 'predictedColumns',
-                              'predictiveCells', 'predictiveColumns'):
-                        if k in layerData:
-                            ret['regions'][regionName][layerName][k] = layerData[k]
+                for k in ('predictedCells', 'predictedColumns',
+                          'predictiveCells', 'predictiveColumns'):
+                    if k in layerData:
+                        ret['layers'][lyrId][k] = layerData[k]
 
             yield ret
 
@@ -245,12 +242,12 @@ class Journal(object):
             responseChannelMarshal.ch.put(self.captureOptions)
 
         elif command == 'get-apical-segments':
-            snapshotId, rgnId, lyrId, segSelector, responseChannelMarshal = args
+            snapshotId, lyrId, segSelector, responseChannelMarshal = args
             modelData = self.journal[snapshotId]
-            layerData = modelData['regions'][rgnId][lyrId]
+            layerData = modelData['layers'][lyrId]
             segsByCol = layerData.get('apicalSegments', {})
 
-            layerTemplate = self.networkShape['regions'][rgnId][lyrId]
+            layerTemplate = self.networkShape['layers'][lyrId]
             defaultCells = range(layerTemplate['cells-per-column'])
             selectedIndices = expandSegmentSelector(segSelector, segsByCol, defaultCells)
 
@@ -273,12 +270,12 @@ class Journal(object):
             responseChannelMarshal.ch.put(ret)
 
         elif command == 'get-distal-segments':
-            snapshotId, rgnId, lyrId, segSelector, responseChannelMarshal = args
+            snapshotId, lyrId, segSelector, responseChannelMarshal = args
             modelData = self.journal[snapshotId]
-            layerData = modelData['regions'][rgnId][lyrId]
+            layerData = modelData['layers'][lyrId]
             segsByCol = layerData.get('distalSegments', {})
 
-            layerTemplate = self.networkShape['regions'][rgnId][lyrId]
+            layerTemplate = self.networkShape['layers'][lyrId]
             defaultCells = range(layerTemplate['cells-per-column'])
             selectedIndices = expandSegmentSelector(segSelector, segsByCol, defaultCells)
 
@@ -301,9 +298,9 @@ class Journal(object):
             responseChannelMarshal.ch.put(ret)
 
         elif command == 'get-proximal-segments':
-            snapshotId, rgnId, lyrId, segSelector, responseChannelMarshal = args
+            snapshotId, lyrId, segSelector, responseChannelMarshal = args
             modelData = self.journal[snapshotId]
-            layerData = modelData['regions'][rgnId][lyrId]
+            layerData = modelData['layers'][lyrId]
             segsByCol = layerData.get('proximalSegments', {})
 
             defaultCells = [-1]
@@ -321,21 +318,21 @@ class Journal(object):
             responseChannelMarshal.ch.put(ret)
 
         elif command == 'get-layer-stats':
-            snapshotId, rgnId, lyrId, fetches, responseChannelMarshal = args
+            snapshotId, lyrId, fetches, responseChannelMarshal = args
 
             modelData = self.journal[snapshotId]
-            layerData = modelData['regions'][rgnId][lyrId]
+            layerData = modelData['layers'][lyrId]
             if 'predictedColumns' in layerData:
                 predictedColumns = set(layerData['predictedColumns'])
             elif snapshotId > 0:
                 prevModelData = self.journal[snapshotId - 1]
-                prevLayerData = prevModelData['regions'][rgnId][lyrId]
+                prevLayerData = prevModelData['layers'][lyrId]
                 predictedColumns = prevLayerData['predictiveColumns']
             else:
                 predictedColumns = set()
 
             modelData = self.journal[snapshotId]
-            layerData = modelData['regions'][rgnId][lyrId]
+            layerData = modelData['layers'][lyrId]
             activeColumns = layerData['activeColumns']
 
             ret = {}
@@ -352,12 +349,12 @@ class Journal(object):
             responseChannelMarshal.ch.put(ret)
 
         elif command == 'get-apical-synapses':
-            snapshotId, rgnId, lyrId, segSelector, synStates, responseChannelMarshal = args
+            snapshotId, lyrId, segSelector, synStates, responseChannelMarshal = args
             modelData = self.journal[snapshotId]
-            layerData = modelData['regions'][rgnId][lyrId]
+            layerData = modelData['layers'][lyrId]
             segsByCol = layerData.get('apicalSegments', {})
 
-            layerTemplate = self.networkShape['regions'][rgnId][lyrId]
+            layerTemplate = self.networkShape['layers'][lyrId]
             defaultCells = range(layerTemplate['cells-per-column'])
             selectedIndices = expandSegmentSelector(segSelector, segsByCol, defaultCells)
 
@@ -365,12 +362,12 @@ class Journal(object):
             responseChannelMarshal.ch.put(response)
 
         elif command == 'get-distal-synapses':
-            snapshotId, rgnId, lyrId, segSelector, synStates, responseChannelMarshal = args
+            snapshotId, lyrId, segSelector, synStates, responseChannelMarshal = args
             modelData = self.journal[snapshotId]
-            layerData = modelData['regions'][rgnId][lyrId]
+            layerData = modelData['layers'][lyrId]
             segsByCol = layerData.get('distalSegments', {})
 
-            layerTemplate = self.networkShape['regions'][rgnId][lyrId]
+            layerTemplate = self.networkShape['layers'][lyrId]
             defaultCells = range(layerTemplate['cells-per-column'])
             selectedIndices = expandSegmentSelector(segSelector, segsByCol, defaultCells)
 
@@ -378,9 +375,9 @@ class Journal(object):
             responseChannelMarshal.ch.put(response)
 
         elif command == 'get-proximal-synapses':
-            snapshotId, rgnId, lyrId, segSelector, synStates, responseChannelMarshal = args
+            snapshotId, lyrId, segSelector, synStates, responseChannelMarshal = args
             modelData = self.journal[snapshotId]
-            layerData = modelData['regions'][rgnId][lyrId]
+            layerData = modelData['layers'][lyrId]
             segsByCol = layerData.get('proximalSegments', {})
 
             defaultCells = [-1]
@@ -391,10 +388,10 @@ class Journal(object):
             responseChannelMarshal.ch.put(response)
 
         elif command == 'get-column-cells':
-            snapshotId, rgnId, lyrId, col, fetches, responseChannelMarshal = args
+            snapshotId, lyrId, col, fetches, responseChannelMarshal = args
             modelData = self.journal[snapshotId]
-            layerData = modelData['regions'][rgnId][lyrId]
-            layerTemplate = self.networkShape['regions'][rgnId][lyrId]
+            layerData = modelData['layers'][lyrId]
+            layerTemplate = self.networkShape['layers'][lyrId]
             cellsPerColumn = layerTemplate['cells-per-column']
             firstCellInCol = col * cellsPerColumn
             activeCellsInCol = set(cellId - firstCellInCol
@@ -407,7 +404,7 @@ class Journal(object):
                 predictedCells = set(layerData['predictedCells'])
             elif snapshotId > 0:
                 prevModelData = self.journal[snapshotId - 1]
-                prevLayerData = prevModelData['regions'][rgnId][lyrId]
+                prevLayerData = prevModelData['layers'][lyrId]
                 predictedCells = prevLayerData['predictiveCells']
             else:
                 predictedCells = set()
@@ -427,9 +424,9 @@ class Journal(object):
             responseChannelMarshal.ch.put(ret)
 
         elif command == 'get-layer-bits':
-            snapshotId, rgnId, lyrId, fetches, cachedOnscreenBits, responseChannelMarshal = args
+            snapshotId, lyrId, fetches, cachedOnscreenBits, responseChannelMarshal = args
 
-            layerData = self.journal[snapshotId]['regions'][rgnId][lyrId]
+            layerData = self.journal[snapshotId]['layers'][lyrId]
 
             ret = {}
             if 'active-columns' in fetches:
@@ -439,7 +436,7 @@ class Journal(object):
                 if 'predictedColumns' in layerData:
                     ret['pred-columns'] = layerData['predictedColumns']
                 elif snapshotId > 0:
-                    prevLayerData = self.journal[snapshotId - 1]['regions'][rgnId][lyrId]
+                    prevLayerData = self.journal[snapshotId - 1]['layers'][lyrId]
                     ret['pred-columns'] = prevLayerData['predictiveColumns']
 
             responseChannelMarshal.ch.put(ret)
@@ -473,8 +470,6 @@ class Journal(object):
                     for sourcePath, synapsesByState in segment['synapses'].items():
                         synapseTemplate = {}
                         synapseTemplate['src-id'] = sourcePath[1]
-                        if sourcePath[0] == 'regions':
-                            synapseTemplate['src-lyr'] = sourcePath[2]
 
                         for state, synapses in synapsesByState.items():
                             if state in synStates:

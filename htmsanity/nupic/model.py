@@ -120,71 +120,69 @@ class SanityModel(object):
                     'activeBits': set([159, 160, 161,])
                 }
             }
-            'regions': {
-                'myRegion1': {
-                    'myLayer3': {
-                        # getNetworkLayout
-                        'ordinal': 1, # Display order
-                        'cellsPerColumn': 32,
-                        'dimensions': (20,),
+            'layers': {
+                'myLayer3': {
+                    # getNetworkLayout
+                    'ordinal': 1, # Display order
+                    'cellsPerColumn': 32,
+                    'dimensions': (20,),
 
-                        # getBitStates
-                        'activeCells': set([0, 1, 2,]),
-                        'activeColumns': set([0, 4, 5, 6, 9, 10,]),
-                        'predictedColumns': set([])
-                        'predictedCells': set([]),
+                    # getBitStates
+                    'activeCells': set([0, 1, 2,]),
+                    'activeColumns': set([0, 4, 5, 6, 9, 10,]),
+                    'predictedColumns': set([])
+                    'predictedCells': set([]),
 
-                        # getProximalSegments
-                        'proximalSegments': {
-                            # Same format as distalSegments
-                        },
+                    # getProximalSegments
+                    'proximalSegments': {
+                        # Same format as distalSegments
+                    },
 
-                        # getApicalSegments
-                        'nDistalStimulusThreshold': 13,
-                        'nDistalLearningThreshold': 9,
-                        'apicalSegments': [
-                            # Same format as distalSegments
-                        ],
+                    # getApicalSegments
+                    'nDistalStimulusThreshold': 13,
+                    'nDistalLearningThreshold': 9,
+                    'apicalSegments': [
+                        # Same format as distalSegments
+                    ],
 
-                        # getDistalSegments
-                        'nDistalStimulusThreshold': 13,
-                        'nDistalLearningThreshold': 9,
-                        'distalSegments': {
-                            # Column
-                            0: {
-                                # Cell
-                                9: [{
-                                    'nDisconnectedActive': 0,
-                                    'nDisconnectedTotal': 0,
-                                    'nConnectedActive': 6,
-                                    'nConnectedTotal': 10
-                                    'synapses': {
-                                        # Path to presynaptic layer / sense
-                                        ('regions', 'myRegion1', 'myLayer3'): [
-                                            'active': [
-                                                # Tuple:
-                                                # - Presynaptic bit
-                                                # - Permanence
-                                                (0, 0.7100000381469727),
-                                                (4, 0.7100000381469727),
-                                            ],
-                                            'disconnected': [],
-                                            'inactive': [],
-                                        ]
-                                    },
+                    # getDistalSegments
+                    'nDistalStimulusThreshold': 13,
+                    'nDistalLearningThreshold': 9,
+                    'distalSegments': {
+                        # Column
+                        0: {
+                            # Cell
+                            9: [{
+                                'nDisconnectedActive': 0,
+                                'nDisconnectedTotal': 0,
+                                'nConnectedActive': 6,
+                                'nConnectedTotal': 10
+                                'synapses': {
+                                    # Path to presynaptic layer / sense
+                                    ('layers', 'myLayer3'): [
+                                        'active': [
+                                            # Tuple:
+                                            # - Presynaptic bit
+                                            # - Permanence
+                                            (0, 0.7100000381469727),
+                                            (4, 0.7100000381469727),
+                                        ],
+                                        'disconnected': [],
+                                        'inactive': [],
+                                    ]
                                 },
-                                {
-                                    'nDisconnectedTotal': 10,
-                                    'nDisconnectedActive': 7,
-                                    'nConnectedActive': 0,
-                                    'nConnectedTotal': 0
-                                    'synapses': {
-                                        ('regions', 'myRegion1', 'myLayer3'): []
-                                    },
-                                },],
                             },
+                            {
+                                'nDisconnectedTotal': 10,
+                                'nDisconnectedActive': 7,
+                                'nConnectedActive': 0,
+                                'nConnectedTotal': 0
+                                'synapses': {
+                                    ('layers', 'myLayer3'): []
+                                },
+                            },],
                         },
-                    }
+                    },
                 }
             },
         }
@@ -481,7 +479,7 @@ class CLASanityModel(SanityModel):
               getDistalSegments=False, distalSegmentsQuery={},
               getApicalSegments=False, apicalSegmentsQuery={}):
         senses = {'concatenated': {}}
-        regions = {'rgn-0': {'layer-3': {}}}
+        layers = {'layer-3': {}}
 
         spRegion = self.model._getSPRegion().getSelf()
         spOutput = spRegion._spatialPoolerOutput
@@ -493,7 +491,7 @@ class CLASanityModel(SanityModel):
                 'dimensions': sp.getInputDimensions(),
                 'ordinal': 0,
             })
-            regions['rgn-0']['layer-3'].update({
+            layers['layer-3'].update({
                 'dimensions': sp.getColumnDimensions(),
                 'cellsPerColumn': tp.cellsPerColumn,
                 'ordinal': 1,
@@ -504,7 +502,7 @@ class CLASanityModel(SanityModel):
                 'activeBits': set(spRegion._spatialPoolerInput.nonzero()[0].tolist()),
             })
             npPredictedCells = tp.getPredictedState().reshape(-1).nonzero()[0]
-            regions['rgn-0']['layer-3'].update({
+            layers['layer-3'].update({
                 "activeColumns": set(spOutput.nonzero()[0].tolist()),
                 "activeCells": set(tp.getActiveState().nonzero()[0].tolist()),
                 "predictiveCells": set(npPredictedCells.tolist()),
@@ -523,7 +521,7 @@ class CLASanityModel(SanityModel):
                                                       onlyConnectedSynapses,
                                                       sourcePath)
 
-            regions['rgn-0']['layer-3'].update({
+            layers['layer-3'].update({
                 'proximalSegments': proximalSegments,
             })
 
@@ -531,10 +529,10 @@ class CLASanityModel(SanityModel):
             assert getBitStates
             try:
                 prevState = bitHistory.next()
-                columnsToCheck = (regions['rgn-0']['layer-3']['activeColumns'] |
-                                  prevState['regions']['rgn-0']['layer-3']['predictiveColumns'])
-                onlySources = prevState['regions']['rgn-0']['layer-3']['activeCells']
-                sourcePath = ('regions', 'rgn-0', 'layer-3')
+                columnsToCheck = (layers['layer-3']['activeColumns'] |
+                                  prevState['layers']['layer-3']['predictiveColumns'])
+                onlySources = prevState['layers']['layer-3']['activeCells']
+                sourcePath = ('layers', 'layer-3')
                 onlyActiveSynapses = distalSegmentsQuery['onlyActiveSynapses']
                 onlyConnectedSynapses = distalSegmentsQuery['onlyConnectedSynapses']
                 if hasattr(tp, "connections"):
@@ -550,7 +548,7 @@ class CLASanityModel(SanityModel):
                                                           sourcePath,
                                                           onlyActiveSynapses,
                                                           onlyConnectedSynapses)
-                regions['rgn-0']['layer-3'].update({
+                layers['layer-3'].update({
                     'distalSegments': distalSegments,
                     "nDistalLearningThreshold": tp.minThreshold,
                     "nDistalStimulusThreshold": tp.activationThreshold,
@@ -561,7 +559,7 @@ class CLASanityModel(SanityModel):
 
         return {
             'senses': senses,
-            'regions': regions,
+            'layers': layers,
         }
 
 
@@ -583,9 +581,9 @@ class ExtendedTemporalMemorySanityModel(SanityModel):
         senses = {
             'external': {}
         }
-        regions = {
-            'tm': {'layer': {}},
-            'higher': {'layer': {}},
+        layers = {
+            'tm': {},
+            'higher': {},
         }
 
         if getNetworkLayout:
@@ -594,13 +592,13 @@ class ExtendedTemporalMemorySanityModel(SanityModel):
                 'ordinal': 0,
             })
 
-            regions['tm']['layer'].update({
+            layers['tm'].update({
                 'cellsPerColumn': tm.getCellsPerColumn(),
                 'dimensions': tm.getColumnDimensions(),
                 'ordinal': 1,
             })
 
-            regions['higher']['layer'].update({
+            layers['higher'].update({
                 'cellsPerColumn': 1,
                 'dimensions': (2048,), # TODO
                 'ordinal': 2,
@@ -613,14 +611,14 @@ class ExtendedTemporalMemorySanityModel(SanityModel):
 
             predictiveCells = set(tm.getPredictiveCells())
             predictiveColumns = set(cell / tm.getCellsPerColumn() for cell in predictiveCells)
-            regions['tm']['layer'].update({
+            layers['tm'].update({
                 'activeColumns': set(self.activeColumns),
                 'activeCells': set(tm.getActiveCells()),
                 'predictedCells': predictiveCells,
                 'predictedColumns': predictiveColumns,
             })
 
-            regions['higher']['layer'].update({
+            layers['higher'].update({
                 'activeColumns': set(self.activeExternalCellsApical),
                 'activeCells': set(self.activeExternalCellsApical),
                 'predictedCells': set(),
@@ -634,19 +632,19 @@ class ExtendedTemporalMemorySanityModel(SanityModel):
 
                 if getDistalSegments:
                     if distalSegmentsQuery['onlyNoteworthyColumns']:
-                        columnsToCheck = (regions['tm']['layer']['activeColumns'] |
-                                          regions['tm']['layer']['predictedColumns'])
+                        columnsToCheck = (layers['tm']['activeColumns'] |
+                                          layers['tm']['predictedColumns'])
                     else:
                         columnsToCheck = xrange(self.tm.numberOfColumns())
 
-                    activeBits = prevState['regions']['tm']['layer']['activeCells']
+                    activeBits = prevState['layers']['tm']['activeCells']
                     activeBits.update(cell + tm.numberOfCells()
                                       for cell in prevState['senses']['external']['activeBits'])
 
 
-                    sourcePath = ('regions', 'tm', 'layer')
+                    sourcePath = ('layers', 'tm')
                     inputsAndWidths = [
-                        (('regions', 'tm', 'layer'), tm.numberOfCells()),
+                        (('layers', 'tm',), tm.numberOfCells()),
                         (('senses', 'external'), 2048) # TODO
                     ]
                     onlyActiveSynapses = distalSegmentsQuery['onlyActiveSynapses']
@@ -656,28 +654,28 @@ class ExtendedTemporalMemorySanityModel(SanityModel):
                                                               onlyActiveSynapses,
                                                               onlyConnectedSynapses,
                                                               inputsAndWidths)
-                    regions['tm']['layer'].update({
+                    layers['tm'].update({
                         'distalSegments': distalSegments,
                         "nDistalLearningThreshold": tm.getMinThreshold(),
                         "nDistalStimulusThreshold": tm.getActivationThreshold(),
                     })
                 if getApicalSegments:
                     if apicalSegmentsQuery['onlyNoteworthyColumns']:
-                        columnsToCheck = (regions['tm']['layer']['activeColumns'] |
-                                          regions['tm']['layer']['predictedColumns'])
+                        columnsToCheck = (layers['tm']['activeColumns'] |
+                                          layers['tm']['predictedColumns'])
                     else:
                         columnsToCheck = xrange(self.tm.numberOfColumns())
 
-                    activeBits = prevState['regions']['tm']['layer']['activeCells']
+                    activeBits = prevState['layers']['tm']['activeCells']
 
                     activeBits.update(cell + tm.numberOfCells()
-                                      for cell in prevState['regions']['higher']['layer']['activeCells'])
+                                      for cell in prevState['layers']['higher']['activeCells'])
 
-                    sourcePath = ('regions', 'higher', 'layer')
+                    sourcePath = ('layers', 'higher')
                     sourceCellsPerColumn = 1
                     inputsAndWidths = [
-                        (('regions', 'tm', 'layer'), tm.numberOfCells()),
-                        (('regions', 'higher', 'layer'), 2048) # TODO
+                        (('layers', 'tm'), tm.numberOfCells()),
+                        (('layers', 'higher'), 2048) # TODO
                     ]
                     sourceCellOffset = -tm.numberOfCells()
                     onlyActiveSynapses = apicalSegmentsQuery['onlyActiveSynapses']
@@ -687,7 +685,7 @@ class ExtendedTemporalMemorySanityModel(SanityModel):
                                                               onlyActiveSynapses,
                                                               onlyConnectedSynapses,
                                                               inputsAndWidths)
-                    regions['tm']['layer'].update({
+                    layers['tm'].update({
                         'apicalSegments': apicalSegments,
                         "nApicalLearningThreshold": tm.getMinThreshold(),
                         "nApicalStimulusThreshold": tm.getActivationThreshold(),
@@ -698,7 +696,7 @@ class ExtendedTemporalMemorySanityModel(SanityModel):
 
         return {
             'senses': senses,
-            'regions': regions,
+            'layers': layers,
         }
 
 
@@ -718,12 +716,12 @@ class TemporalMemorySanityModel(SanityModel):
 
         senses = {
         }
-        regions = {
-            'tm': {'layer': {}},
+        layers = {
+            'tm': {},
         }
 
         if getNetworkLayout:
-            regions['tm']['layer'].update({
+            layers['tm'].update({
                 'cellsPerColumn': tm.getCellsPerColumn(),
                 'dimensions': tm.getColumnDimensions(),
                 'ordinal': 1,
@@ -732,7 +730,7 @@ class TemporalMemorySanityModel(SanityModel):
         if getBitStates:
             predictiveCells = set(tm.getPredictiveCells())
             predictiveColumns = set(cell / tm.getCellsPerColumn() for cell in predictiveCells)
-            regions['tm']['layer'].update({
+            layers['tm'].update({
                 'activeColumns': set(self.activeColumns),
                 'activeCells': set(tm.getActiveCells()),
                 'predictiveCells': predictiveCells,
@@ -745,16 +743,16 @@ class TemporalMemorySanityModel(SanityModel):
                 prevState = bitHistory.next()
 
                 if distalSegmentsQuery['onlyNoteworthyColumns']:
-                    columnsToCheck = (regions['tm']['layer']['activeColumns'] |
-                                      prevState['regions']['tm']['layer']['predictiveColumns'])
+                    columnsToCheck = (layers['tm']['activeColumns'] |
+                                      prevState['layers']['tm']['predictiveColumns'])
                 else:
                     columnsToCheck = xrange(self.tm.numberOfColumns())
 
-                activeBits = prevState['regions']['tm']['layer']['activeCells']
+                activeBits = prevState['layers']['tm']['activeCells']
 
-                sourcePath = ('regions', 'tm', 'layer')
+                sourcePath = ('layers', 'tm')
                 inputsAndWidths = [
-                    (('regions', 'tm', 'layer'), tm.numberOfCells()),
+                    (('layers', 'tm'), tm.numberOfCells()),
                 ]
                 onlyActiveSynapses = distalSegmentsQuery['onlyActiveSynapses']
                 onlyConnectedSynapses = distalSegmentsQuery['onlyConnectedSynapses']
@@ -763,7 +761,7 @@ class TemporalMemorySanityModel(SanityModel):
                                                           onlyActiveSynapses,
                                                           onlyConnectedSynapses,
                                                           inputsAndWidths)
-                regions['tm']['layer'].update({
+                layers['tm'].update({
                     'distalSegments': distalSegments,
                     "nDistalLearningThreshold": tm.getMinThreshold(),
                     "nDistalStimulusThreshold": tm.getActivationThreshold(),
@@ -774,7 +772,7 @@ class TemporalMemorySanityModel(SanityModel):
 
         return {
             'senses': senses,
-            'regions': regions,
+            'layers': layers,
         }
 
 
@@ -873,12 +871,12 @@ class SMTMSequenceSanityModel(SanityModel):
 
         senses = {
         }
-        regions = {
-            'tm': {'layer': {}},
+        layers = {
+            'tm': {},
         }
 
         if getNetworkLayout:
-            regions['tm']['layer'].update({
+            layers['tm'].update({
                 'cellsPerColumn': tm.cellsPerColumn,
                 'dimensions': (tm.numColumns,),
                 'ordinal': 1,
@@ -886,7 +884,7 @@ class SMTMSequenceSanityModel(SanityModel):
 
         if getBitStates:
             predictedCells = tm.getPreviouslyPredictedCells()
-            regions['tm']['layer'].update({
+            layers['tm'].update({
                 'activeColumns': set(self.activeColumns),
                 'activeCells': set(tm.activeCells),
                 'predictedCells': set(predictedCells),
@@ -899,16 +897,16 @@ class SMTMSequenceSanityModel(SanityModel):
                 prevState = bitHistory.next()
 
                 if distalSegmentsQuery['onlyNoteworthyColumns']:
-                    columnsToCheck = (regions['tm']['layer']['activeColumns'] |
-                                      regions['tm']['layer']['predictedColumns'])
+                    columnsToCheck = (layers['tm']['activeColumns'] |
+                                      layers['tm']['predictedColumns'])
                 else:
                     columnsToCheck = xrange(self.tm.numColumns)
 
-                activeBits = prevState['regions']['tm']['layer']['activeCells']
+                activeBits = prevState['layers']['tm']['activeCells']
 
-                sourcePath = ('regions', 'tm', 'layer')
+                sourcePath = ('layers', 'tm')
                 inputsAndWidths = [
-                    (('regions', 'tm', 'layer'), tm.numColumns * tm.cellsPerColumn),
+                    (('layers', 'tm'), tm.numColumns * tm.cellsPerColumn),
                 ]
                 onlyActiveSynapses = distalSegmentsQuery['onlyActiveSynapses']
                 onlyConnectedSynapses = distalSegmentsQuery['onlyConnectedSynapses']
@@ -918,7 +916,7 @@ class SMTMSequenceSanityModel(SanityModel):
                     onlyActiveSynapses,
                     onlyConnectedSynapses,
                     inputsAndWidths)
-                regions['tm']['layer'].update({
+                layers['tm'].update({
                     'distalSegments': distalSegments,
                     "nDistalLearningThreshold": tm.minThreshold,
                     "nDistalStimulusThreshold": tm.activationThreshold,
@@ -929,7 +927,7 @@ class SMTMSequenceSanityModel(SanityModel):
 
         return {
             'senses': senses,
-            'regions': regions,
+            'layers': layers,
         }
 
 
@@ -951,9 +949,9 @@ class SMTMExternalSanityModel(SanityModel):
         senses = {
             'external': {}
         }
-        regions = {
-            'tm': {'layer': {}},
-            'higher': {'layer': {}},
+        layers = {
+            'tm': {},
+            'higher': {},
         }
 
         if getNetworkLayout:
@@ -962,13 +960,13 @@ class SMTMExternalSanityModel(SanityModel):
                 'ordinal': 0,
             })
 
-            regions['tm']['layer'].update({
+            layers['tm'].update({
                 'cellsPerColumn': tm.cellsPerColumn,
                 'dimensions': tm.columnDimensions,
                 'ordinal': 1,
             })
 
-            regions['higher']['layer'].update({
+            layers['higher'].update({
                 'cellsPerColumn': 1,
                 'dimensions': tm.apicalInputDimensions,
                 'ordinal': 2,
@@ -981,14 +979,14 @@ class SMTMExternalSanityModel(SanityModel):
 
             predictedCells = set(tm.getPreviouslyPredictedCells())
             predictedColumns = set(cell / tm.cellsPerColumn for cell in predictedCells)
-            regions['tm']['layer'].update({
+            layers['tm'].update({
                 'activeColumns': set(self.activeColumns),
                 'activeCells': set(tm.getActiveCells()),
                 'predictedCells': predictedCells,
                 'predictedColumns': predictedColumns,
             })
 
-            regions['higher']['layer'].update({
+            layers['higher'].update({
                 'activeColumns': set(self.activeExternalCellsApical),
                 'activeCells': set(self.activeExternalCellsApical),
                 'predictedCells': set(),
@@ -1002,8 +1000,8 @@ class SMTMExternalSanityModel(SanityModel):
 
                 if getDistalSegments:
                     if distalSegmentsQuery['onlyNoteworthyColumns']:
-                        columnsToCheck = (regions['tm']['layer']['activeColumns'] |
-                                          regions['tm']['layer']['predictedColumns'])
+                        columnsToCheck = (layers['tm']['activeColumns'] |
+                                          layers['tm']['predictedColumns'])
                     else:
                         columnsToCheck = xrange(self.tm.numColumns)
 
@@ -1020,23 +1018,23 @@ class SMTMExternalSanityModel(SanityModel):
                         onlyActiveSynapses,
                         onlyConnectedSynapses,
                         inputsAndWidths)
-                    regions['tm']['layer'].update({
+                    layers['tm'].update({
                         'distalSegments': distalSegments,
                         "nDistalLearningThreshold": tm.minThreshold,
                         "nDistalStimulusThreshold": tm.activationThreshold,
                     })
                 if getApicalSegments:
                     if apicalSegmentsQuery['onlyNoteworthyColumns']:
-                        columnsToCheck = (regions['tm']['layer']['activeColumns'] |
-                                          regions['tm']['layer']['predictedColumns'])
+                        columnsToCheck = (layers['tm']['activeColumns'] |
+                                          layers['tm']['predictedColumns'])
                     else:
                         columnsToCheck = xrange(self.tm.numColumns)
 
-                    activeBits = regions['higher']['layer']['activeCells']
+                    activeBits = layers['higher']['activeCells']
 
                     sourceCellsPerColumn = 1
                     inputsAndWidths = [
-                        (('regions', 'higher', 'layer'), tm.apicalConnections.matrix.nCols()),
+                        (('layers', 'higher'), tm.apicalConnections.matrix.nCols()),
                     ]
                     sourceCellOffset = -tm.numColumns * tm.cellsPerColumn
                     onlyActiveSynapses = apicalSegmentsQuery['onlyActiveSynapses']
@@ -1047,7 +1045,7 @@ class SMTMExternalSanityModel(SanityModel):
                         onlyActiveSynapses,
                         onlyConnectedSynapses,
                         inputsAndWidths)
-                    regions['tm']['layer'].update({
+                    layers['tm'].update({
                         'apicalSegments': apicalSegments,
                         "nApicalLearningThreshold": tm.minThreshold,
                         "nApicalStimulusThreshold": tm.activationThreshold,
@@ -1058,7 +1056,7 @@ class SMTMExternalSanityModel(SanityModel):
 
         return {
             'senses': senses,
-            'regions': regions,
+            'layers': layers,
         }
 
 
@@ -1095,8 +1093,8 @@ class SPTMModel(SanityModel):
         senses = {
             'concatenated': {},
         }
-        regions = {
-            'sp+tm': {'layer': {}},
+        layers = {
+            'sp+tm': {},
         }
 
         if getNetworkLayout:
@@ -1105,7 +1103,7 @@ class SPTMModel(SanityModel):
                 'ordinal': 0,
             })
 
-            regions['sp+tm']['layer'].update({
+            layers['sp+tm'].update({
                 'cellsPerColumn': tm.getCellsPerColumn(),
                 'dimensions': sp.getColumnDimensions(),
                 'ordinal': 1,
@@ -1118,7 +1116,7 @@ class SPTMModel(SanityModel):
 
             predictedColumns = set(cell / tm.getCellsPerColumn()
                                    for cell in self.predictedCells)
-            regions['sp+tm']['layer'].update({
+            layers['sp+tm'].update({
                 'activeColumns': set(self.activeColumns),
                 'activeCells': set(tm.getActiveCells()),
                 'predictedCells': set(self.predictedCells),
@@ -1134,7 +1132,7 @@ class SPTMModel(SanityModel):
                 onlyActiveSynapses, onlyConnectedSynapses,
                 sourcePath)
 
-            regions['sp+tm']['layer'].update({
+            layers['sp+tm'].update({
                 'proximalSegments': proximalSegments,
             })
 
@@ -1144,15 +1142,15 @@ class SPTMModel(SanityModel):
 
                 if distalSegmentsQuery['onlyNoteworthyColumns']:
                     columnsToCheck = (
-                        regions['sp+tm']['layer']['activeColumns'] |
-                        regions['sp+tm']['layer']['predictedColumns'])
+                        layers['sp+tm']['activeColumns'] |
+                        layers['sp+tm']['predictedColumns'])
                 else:
                     columnsToCheck = xrange(sp.getNumColumns())
 
-                activeBits = prevState['regions']['sp+tm']['layer']['activeCells']
+                activeBits = prevState['layers']['sp+tm']['activeCells']
 
                 inputsAndWidths = [
-                    (('regions', 'sp+tm', 'layer'), tm.numberOfCells()),
+                    (('layers', 'sp+tm'), tm.numberOfCells()),
                 ]
                 onlyActiveSynapses = distalSegmentsQuery['onlyActiveSynapses']
                 onlyConnectedSynapses = distalSegmentsQuery['onlyConnectedSynapses']
@@ -1163,7 +1161,7 @@ class SPTMModel(SanityModel):
                     onlyConnectedSynapses,
                     inputsAndWidths)
 
-                regions['sp+tm']['layer'].update({
+                layers['sp+tm'].update({
                     'distalSegments': distalSegments,
                     "nDistalLearningThreshold": tm.getMinThreshold(),
                     "nDistalStimulusThreshold": tm.getActivationThreshold(),
@@ -1174,5 +1172,5 @@ class SPTMModel(SanityModel):
 
         return {
             'senses': senses,
-            'regions': regions,
+            'layers': layers,
         }

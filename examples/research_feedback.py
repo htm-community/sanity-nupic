@@ -199,21 +199,21 @@ class FeedbackExperimentSanityModel(SanityModel):
               getApicalSegments=False, apicalSegmentsQuery={}):
         senses = {
         }
-        regions = {
-            'tm': {'layer': {}},
-            'pseudo': {'layer': {}},
+        layers = {
+            'tm': {},
+            'pseudo': {},
         }
 
         tm = self.tm
 
         if getNetworkLayout:
-            regions['tm']['layer'].update({
+            layers['tm'].update({
                 'cellsPerColumn': tm.cellsPerColumn,
                 'dimensions': tm.columnDimensions,
                 'ordinal': 0,
             })
 
-            regions['pseudo']['layer'].update({
+            layers['pseudo'].update({
                 'cellsPerColumn': 1,
                 'dimensions': [2048],
                 'ordinal': 1,
@@ -243,7 +243,7 @@ class FeedbackExperimentSanityModel(SanityModel):
 
             predictiveCells = set(tm.getPredictiveCells())
             predictiveColumns = set(cell / tm.cellsPerColumn for cell in predictiveCells)
-            regions['tm']['layer'].update({
+            layers['tm'].update({
                 'activeColumns': activeBits,
                 'activeCells': set(tm.activeCells),
                 'predictiveCells': set(predictiveCells),
@@ -254,7 +254,7 @@ class FeedbackExperimentSanityModel(SanityModel):
             if feedbackPattern is not None:
                 activeFeedbackColumns = set(feedbackPattern)
 
-            regions['pseudo']['layer'].update({
+            layers['pseudo'].update({
                 'activeColumns': feedbackPattern,
                 'activeCells': feedbackPattern,
                 'predictiveCells': set(),
@@ -265,12 +265,12 @@ class FeedbackExperimentSanityModel(SanityModel):
             assert getBitStates
             try:
                 prevState = bitHistory.next()
-                columnsToCheck = (regions['tm']['layer']['activeColumns'] |
-                                  prevState['regions']['tm']['layer']['predictiveColumns'])
+                columnsToCheck = (layers['tm']['activeColumns'] |
+                                  prevState['layers']['tm']['predictiveColumns'])
 
                 if getDistalSegments:
-                    onlySources = prevState['regions']['tm']['layer']['activeCells']
-                    sourcePath = ('regions', 'tm', 'layer')
+                    onlySources = prevState['layers']['tm']['activeCells']
+                    sourcePath = ('layers', 'tm')
                     onlyActiveSynapses = distalSegmentsQuery['onlyActiveSynapses']
                     onlyConnectedSynapses = distalSegmentsQuery['onlyConnectedSynapses']
                     distalSegments = segmentsFromConnections(tm.basalConnections, tm,
@@ -278,14 +278,14 @@ class FeedbackExperimentSanityModel(SanityModel):
                                                              sourcePath,
                                                              onlyActiveSynapses,
                                                              onlyConnectedSynapses)
-                    regions['tm']['layer'].update({
+                    layers['tm'].update({
                         'distalSegments': distalSegments,
                         "nDistalLearningThreshold": tm.minThreshold,
                         "nDistalStimulusThreshold": tm.activationThreshold,
                     })
                 if getApicalSegments:
-                    onlySources = prevState['regions']['pseudo']['layer']['activeCells']
-                    sourcePath = ('regions', 'pseudo', 'layer')
+                    onlySources = prevState['layers']['pseudo']['activeCells']
+                    sourcePath = ('layers', 'pseudo')
                     sourceCellsPerColumn = 1
                     sourceCellOffset = -tm.numberOfCells()
                     onlyActiveSynapses = apicalSegmentsQuery['onlyActiveSynapses']
@@ -296,7 +296,7 @@ class FeedbackExperimentSanityModel(SanityModel):
                                                              onlyActiveSynapses,
                                                              onlyConnectedSynapses,
                                                              sourceCellOffset)
-                    regions['tm']['layer'].update({
+                    layers['tm'].update({
                         'apicalSegments': apicalSegments,
                         "nApicalLearningThreshold": tm.minThreshold,
                         "nApicalStimulusThreshold": tm.activationThreshold,
@@ -307,7 +307,7 @@ class FeedbackExperimentSanityModel(SanityModel):
 
         return {
             'senses': senses,
-            'regions': regions,
+            'layers': layers,
         }
 
 def experiment2():
