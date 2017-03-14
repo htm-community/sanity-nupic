@@ -14,7 +14,7 @@ Videos:
 pip install sanity-nupic
 ~~~
 
-Current version: `0.0.13`
+Current version: `0.0.14`
 
 Now, just patch your model.
 
