@@ -11,10 +11,10 @@ Videos:
 ## How to use it
 
 ~~~
-pip install sanity-nupic --user
+pip install sanity-nupic
 ~~~
 
-Current version: `0.0.12`
+Current version: `0.0.13`
 
 Now, just patch your model.
 
