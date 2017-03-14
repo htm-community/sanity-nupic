@@ -1,4 +1,5 @@
 import csv
+import io
 
 import numpy as np
 
@@ -6,8 +7,21 @@ from nupic.bindings.algorithms import ConnectionsEventHandler
 
 
 class TimeSeriesLogger(object):
-  def __init__(self, outStream):
+  def __init__(self, outStream=None):
+    if outStream is None:
+      self.textOut = io.BytesIO()
+      outStream = self.textOut
+    else:
+      self.textOut = None
+
     self.csvOut = csv.writer(outStream)
+
+
+  def extract(self):
+    if self.textOut is None:
+      raise AssertionError("Don't use extract if you're supplying your own outStream.")
+
+    return self.textOut.getvalue()
 
 
   def startLoggingSegmentGrowth(self, connections):
@@ -25,16 +39,16 @@ class TimeSeriesLogger(object):
                           burstingColumns.size, predictedInactiveColumns.size))
 
 
-  def logSegmentActivity(self, tm, activeColumnsDense):
+  def logSegmentActivity(self, tm, activeColumns):
     activeSegments = tm.getActiveSegments()
     matchingSegments = np.setdiff1d(tm.getMatchingSegments(), activeSegments)
 
     (correctActiveSegments,
      incorrectActiveSegments) = _getSegmentAccuracy(activeSegments,
-                                                    tm, activeColumnsDense)
+                                                    tm, activeColumns)
     (correctMatchingSegments,
      incorrectMatchingSegments) = _getSegmentAccuracy(matchingSegments,
-                                                      tm, activeColumnsDense)
+                                                      tm, activeColumns)
 
     if correctActiveSegments.size > 0:
       self.csvOut.writerow(["correctActiveSegments"] +
@@ -74,9 +88,9 @@ class SegmentLogger(ConnectionsEventHandler):
 
 
 
-def _getSegmentAccuracy(segments, tm, activeColumnsDense):
+def _getSegmentAccuracy(segments, tm, activeColumns):
   columnsForSegments = (tm.connections.mapSegmentsToCells(segments) /
                         tm.getCellsPerColumn())
-  correctSegmentsMask = activeColumnsDense[columnsForSegments] != 0
+  correctSegmentsMask = np.in1d(columnsForSegments, activeColumns)
 
   return segments[correctSegmentsMask], segments[~correctSegmentsMask]
