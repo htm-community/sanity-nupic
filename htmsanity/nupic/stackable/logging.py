@@ -16,6 +16,8 @@ class TimeSeriesLogger(object):
 
     self.csvOut = csv.writer(outStream)
 
+    self.timestep = 0
+
 
   def extract(self):
     if self.textOut is None:
@@ -67,8 +69,9 @@ class TimeSeriesLogger(object):
                            incorrectMatchingSegments.tolist())
 
 
-  def logTimestep(self, t):
-    self.csvOut.writerow(('t', t))
+  def logTimestep(self):
+    self.csvOut.writerow(('t', self.timestep))
+    self.timestep += 1
 
 
 
