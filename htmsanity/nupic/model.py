@@ -485,7 +485,6 @@ class CLASanityModel(SanityModel):
         spOutput = spRegion._spatialPoolerOutput
         sp = spRegion._sfdr
         tm = self.model._getTPRegion().getSelf()._tfdr
-        print type(tm)
 
         if getNetworkLayout:
             senses['concatenated'].update({
@@ -589,19 +588,19 @@ class ExtendedTemporalMemorySanityModel(SanityModel):
 
         if getNetworkLayout:
             senses['external'].update({
-                'dimensions': (2048,), # TODO
+                'dimensions': [tm.getBasalInputSize()],
                 'ordinal': 0,
             })
 
             layers['tm'].update({
                 'cellsPerColumn': tm.getCellsPerColumn(),
-                'dimensions': tm.getColumnDimensions(),
+                'dimensions': (tm.numberOfColumns(),),
                 'ordinal': 1,
             })
 
             layers['higher'].update({
                 'cellsPerColumn': 1,
-                'dimensions': (2048,), # TODO
+                'dimensions': (tm.getApicalInputSize(),),
                 'ordinal': 2,
             })
 
@@ -610,13 +609,12 @@ class ExtendedTemporalMemorySanityModel(SanityModel):
                 'activeBits': set(self.activeExternalCellsBasal)
             })
 
-            predictiveCells = set(tm.getPredictiveCells())
-            predictiveColumns = set(cell / tm.getCellsPerColumn() for cell in predictiveCells)
+            predictedCells = tm.getPredictedCells()
             layers['tm'].update({
                 'activeColumns': set(self.activeColumns),
                 'activeCells': set(tm.getActiveCells()),
-                'predictedCells': predictiveCells,
-                'predictedColumns': predictiveColumns,
+                'predictedCells': set(predictedCells),
+                'predictedColumns': set(predictedCells / tm.getCellsPerColumn()),
             })
 
             layers['higher'].update({
@@ -638,15 +636,10 @@ class ExtendedTemporalMemorySanityModel(SanityModel):
                     else:
                         columnsToCheck = xrange(self.tm.numberOfColumns())
 
-                    activeBits = prevState['layers']['tm']['activeCells']
-                    activeBits.update(cell + tm.numberOfCells()
-                                      for cell in prevState['senses']['external']['activeBits'])
+                    activeBits = senses['external']['activeBits']
 
-
-                    sourcePath = ('layers', 'tm')
                     inputsAndWidths = [
-                        (('layers', 'tm',), tm.numberOfCells()),
-                        (('senses', 'external'), 2048) # TODO
+                        (('senses', 'external'), tm.getBasalInputSize())
                     ]
                     onlyActiveSynapses = distalSegmentsQuery['onlyActiveSynapses']
                     onlyConnectedSynapses = distalSegmentsQuery['onlyConnectedSynapses']
@@ -672,11 +665,9 @@ class ExtendedTemporalMemorySanityModel(SanityModel):
                     activeBits.update(cell + tm.numberOfCells()
                                       for cell in prevState['layers']['higher']['activeCells'])
 
-                    sourcePath = ('layers', 'higher')
                     sourceCellsPerColumn = 1
                     inputsAndWidths = [
-                        (('layers', 'tm'), tm.numberOfCells()),
-                        (('layers', 'higher'), 2048) # TODO
+                        (('layers', 'higher'), tm.getApicalInputSize()) # TODO
                     ]
                     sourceCellOffset = -tm.numberOfCells()
                     onlyActiveSynapses = apicalSegmentsQuery['onlyActiveSynapses']
@@ -751,7 +742,6 @@ class TemporalMemorySanityModel(SanityModel):
 
                 activeBits = prevState['layers']['tm']['activeCells']
 
-                sourcePath = ('layers', 'tm')
                 inputsAndWidths = [
                     (('layers', 'tm'), tm.numberOfCells()),
                 ]
@@ -879,12 +869,12 @@ class SMTMSequenceSanityModel(SanityModel):
         if getNetworkLayout:
             layers['tm'].update({
                 'cellsPerColumn': tm.cellsPerColumn,
-                'dimensions': (tm.numColumns,),
+                'dimensions': (tm.columnCount,),
                 'ordinal': 1,
             })
 
         if getBitStates:
-            predictedCells = tm.getPreviouslyPredictedCells()
+            predictedCells = tm.getPredictedCells()
             layers['tm'].update({
                 'activeColumns': set(self.activeColumns),
                 'activeCells': set(tm.activeCells),
@@ -901,13 +891,13 @@ class SMTMSequenceSanityModel(SanityModel):
                     columnsToCheck = (layers['tm']['activeColumns'] |
                                       layers['tm']['predictedColumns'])
                 else:
-                    columnsToCheck = xrange(self.tm.numColumns)
+                    columnsToCheck = xrange(self.tm.columnCount)
 
                 activeBits = prevState['layers']['tm']['activeCells']
 
                 sourcePath = ('layers', 'tm')
                 inputsAndWidths = [
-                    (('layers', 'tm'), tm.numColumns * tm.cellsPerColumn),
+                    (('layers', 'tm'), tm.columnCount * tm.cellsPerColumn),
                 ]
                 onlyActiveSynapses = distalSegmentsQuery['onlyActiveSynapses']
                 onlyConnectedSynapses = distalSegmentsQuery['onlyConnectedSynapses']
@@ -957,19 +947,19 @@ class SMTMExternalSanityModel(SanityModel):
 
         if getNetworkLayout:
             senses['external'].update({
-                'dimensions': tm.basalInputDimensions,
+                'dimensions': (tm.basalConnections.matrix.nCols(),),
                 'ordinal': 0,
             })
 
             layers['tm'].update({
-                'cellsPerColumn': tm.cellsPerColumn,
-                'dimensions': tm.columnDimensions,
+                'cellsPerColumn': tm.getCellsPerColumn(),
+                'dimensions': (tm.numberOfColumns(),),
                 'ordinal': 1,
             })
 
             layers['higher'].update({
                 'cellsPerColumn': 1,
-                'dimensions': tm.apicalInputDimensions,
+                'dimensions': (tm.apicalConnections.matrix.nCols(),),
                 'ordinal': 2,
             })
 
@@ -978,13 +968,12 @@ class SMTMExternalSanityModel(SanityModel):
                 'activeBits': set(self.activeExternalCellsBasal)
             })
 
-            predictedCells = set(tm.getPreviouslyPredictedCells())
-            predictedColumns = set(cell / tm.cellsPerColumn for cell in predictedCells)
+            predictedCells = tm.getPredictedCells()
             layers['tm'].update({
                 'activeColumns': set(self.activeColumns),
                 'activeCells': set(tm.getActiveCells()),
-                'predictedCells': predictedCells,
-                'predictedColumns': predictedColumns,
+                'predictedCells': set(predictedCells),
+                'predictedColumns': set(predictedCells / tm.cellsPerColumn),
             })
 
             layers['higher'].update({
@@ -1004,7 +993,7 @@ class SMTMExternalSanityModel(SanityModel):
                         columnsToCheck = (layers['tm']['activeColumns'] |
                                           layers['tm']['predictedColumns'])
                     else:
-                        columnsToCheck = xrange(self.tm.numColumns)
+                        columnsToCheck = xrange(self.tm.columnCount)
 
                     activeBits = senses['external']['activeBits']
 
@@ -1029,7 +1018,7 @@ class SMTMExternalSanityModel(SanityModel):
                         columnsToCheck = (layers['tm']['activeColumns'] |
                                           layers['tm']['predictedColumns'])
                     else:
-                        columnsToCheck = xrange(self.tm.numColumns)
+                        columnsToCheck = xrange(self.tm.columnCount)
 
                     activeBits = layers['higher']['activeCells']
 
@@ -1037,7 +1026,7 @@ class SMTMExternalSanityModel(SanityModel):
                     inputsAndWidths = [
                         (('layers', 'higher'), tm.apicalConnections.matrix.nCols()),
                     ]
-                    sourceCellOffset = -tm.numColumns * tm.cellsPerColumn
+                    sourceCellOffset = -tm.columnCount * tm.cellsPerColumn
                     onlyActiveSynapses = apicalSegmentsQuery['onlyActiveSynapses']
                     onlyConnectedSynapses = apicalSegmentsQuery['onlyConnectedSynapses']
                     apicalSegments = segmentsFromSegmentSparseMatrix(

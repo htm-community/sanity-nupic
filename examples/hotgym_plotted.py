@@ -10,8 +10,8 @@ from swarmed_model_params import MODEL_PARAMS
 
 from nupic.data.inference_shifter import InferenceShifter
 from nupic.frameworks.opf.metrics import MetricSpec
-from nupic.frameworks.opf.modelfactory import ModelFactory
-from nupic.frameworks.opf.predictionmetricsmanager import MetricsManager
+from nupic.frameworks.opf.model_factory import ModelFactory
+from nupic.frameworks.opf.prediction_metrics_manager import MetricsManager
 
 import matplotlib
 matplotlib.use('TkAgg')
