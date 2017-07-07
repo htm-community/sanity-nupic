@@ -484,7 +484,8 @@ class CLASanityModel(SanityModel):
         spRegion = self.model._getSPRegion().getSelf()
         spOutput = spRegion._spatialPoolerOutput
         sp = spRegion._sfdr
-        tp = self.model._getTPRegion().getSelf()._tfdr
+        tm = self.model._getTPRegion().getSelf()._tfdr
+        print type(tm)
 
         if getNetworkLayout:
             senses['concatenated'].update({
@@ -493,7 +494,7 @@ class CLASanityModel(SanityModel):
             })
             layers['layer-3'].update({
                 'dimensions': sp.getColumnDimensions(),
-                'cellsPerColumn': tp.cellsPerColumn,
+                'cellsPerColumn': tm.cellsPerColumn,
                 'ordinal': 1,
             })
 
@@ -501,13 +502,13 @@ class CLASanityModel(SanityModel):
             senses['concatenated'].update({
                 'activeBits': set(spRegion._spatialPoolerInput.nonzero()[0].tolist()),
             })
-            npPredictedCells = tp.getPredictedState().reshape(-1).nonzero()[0]
+            npPredictedCells = tm.getPredictedState().reshape(-1).nonzero()[0]
             layers['layer-3'].update({
                 "activeColumns": set(spOutput.nonzero()[0].tolist()),
-                "activeCells": set(tp.getActiveState().nonzero()[0].tolist()),
+                "activeCells": set(tm._getActiveState().nonzero()[0].tolist()),
                 "predictiveCells": set(npPredictedCells.tolist()),
                 "predictiveColumns": set(np.unique(npPredictedCells /
-                                                   tp.cellsPerColumn).tolist()),
+                                                   tm.cellsPerColumn).tolist()),
             })
 
         if getProximalSegments:
@@ -535,23 +536,23 @@ class CLASanityModel(SanityModel):
                 sourcePath = ('layers', 'layer-3')
                 onlyActiveSynapses = distalSegmentsQuery['onlyActiveSynapses']
                 onlyConnectedSynapses = distalSegmentsQuery['onlyConnectedSynapses']
-                if hasattr(tp, "connections"):
-                    distalSegments = segmentsFromConnections(tp.connections, tp,
+                if hasattr(tm, "connections"):
+                    distalSegments = segmentsFromConnections(tm.connections, tm,
                                                              columnsToCheck,
                                                              onlySources,
                                                              sourcePath,
                                                              onlyActiveSynapses,
                                                              onlyConnectedSynapses)
                 else:
-                    distalSegments = distalSegmentsFromTP(tp, columnsToCheck,
+                    distalSegments = distalSegmentsFromTP(tm, columnsToCheck,
                                                           onlySources,
                                                           sourcePath,
                                                           onlyActiveSynapses,
                                                           onlyConnectedSynapses)
                 layers['layer-3'].update({
                     'distalSegments': distalSegments,
-                    "nDistalLearningThreshold": tp.minThreshold,
-                    "nDistalStimulusThreshold": tp.activationThreshold,
+                    "nDistalLearningThreshold": tm.minThreshold,
+                    "nDistalStimulusThreshold": tm.activationThreshold,
                 })
             except StopIteration:
                 # No previous timestep available.
